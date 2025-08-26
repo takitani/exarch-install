@@ -171,6 +171,11 @@ Se você possui um Dell XPS 13 Plus, o script:
 **Problema com yay:**
 - Se receber erro sobre uso de yay como root, o script já trata isso automaticamente
 
+**AWS VPN Client não conecta:**
+- Verifique se systemd-resolved está rodando: `systemctl status systemd-resolved`
+- Verifique se o serviço está ativo: `systemctl status awsvpnclient`
+- Reinicie os serviços se necessário: `sudo systemctl restart systemd-resolved awsvpnclient`
+
 **Webcam não funciona no Dell XPS:**
 - Reinicie o sistema após a instalação
 - Verifique se os módulos foram carregados: `lsmod | grep -E 'intel_vsc|mei_csi|mei_ace'`
