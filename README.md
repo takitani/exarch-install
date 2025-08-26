@@ -1,15 +1,57 @@
-# Omarchy Linux Post-Installation Scripts
+```
+███████╗██╗  ██╗ █████╗ ██████╗  ██████╗██╗  ██╗
+██╔════╝╚██╗██╔╝██╔══██╗██╔══██╗██╔════╝██║  ██║
+█████╗   ╚███╔╝ ███████║██████╔╝██║     ███████║
+██╔══╝   ██╔██╗ ██╔══██║██╔══██╗██║     ██╔══██║
+███████╗██╔╝ ██╗██║  ██║██║  ██║╚██████╗██║  ██║
+╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
+                                                  
+     █████╗ ██████╗  ██████╗██╗  ██╗             
+    ██╔══██╗██╔══██╗██╔════╝██║  ██║             
+    ███████║██████╔╝██║     ███████║             
+    ██╔══██║██╔══██╗██║     ██╔══██║             
+    ██║  ██║██║  ██║╚██████╗██║  ██║             
+    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝             
+                                                  
+    ██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗       
+    ██║     ██║████╗  ██║██║   ██║╚██╗██╔╝       
+    ██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝        
+    ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗        
+    ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗       
+    ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝       
+```
 
-Scripts de configuração pós-instalação para Omarchy Linux (distribuição baseada em Arch Linux com Hyprland).
+# 🚀 Exarch Scripts - Post-Installation Setup for Omarchy Linux
+
+Scripts de configuração pós-instalação para [**Omarchy Linux**](https://omarchy.org/) - uma distribuição moderna baseada em Arch Linux com Hyprland como gerenciador de janelas.
+
+## 📋 Pré-requisitos
+
+### 1. Instalar Omarchy Linux primeiro!
+
+Este script foi projetado especificamente para rodar **após** a instalação do Omarchy Linux.
+
+1. **Baixe o ISO do Omarchy**: https://omarchy.org/
+2. **Instale o sistema** seguindo as instruções da distribuição
+3. **Reinicie** e faça login no seu novo sistema Omarchy
+4. **Clone este repositório** e execute o script
+
+> ⚠️ **IMPORTANTE**: Este script assume que você já tem o Omarchy Linux instalado com:
+> - `yay` (gerenciador AUR - padrão no Omarchy)
+> - `mise` (gerenciador de ambientes - padrão no Omarchy)
+> - `hyprland` (gerenciador de janelas - padrão no Omarchy)
 
 ## post-omarchy-setup.sh
 
 Script automatizado com menu interativo para configurar o ambiente após uma instalação limpa do Omarchy Linux. O script assume que o sistema já possui `yay` instalado (padrão no Omarchy).
 
-### 🎨 Menu Interativo
+### 🎨 Menu Interativo Avançado
 
-O script apresenta um menu interativo que permite:
-- Seleção individual de componentes para instalar
+O script apresenta um menu interativo moderno com navegação por teclado:
+- **Navegação com setas** ↑ ↓ para mover entre opções
+- **Barra de espaço** para marcar/desmarcar itens
+- **Enter** para confirmar seleção
+- **Indicador visual** da opção selecionada
 - Perfis pré-configurados (Recomendados, Desenvolvimento Completo)
 - Detecção automática de hardware (Dell XPS 13 Plus)
 - Visualização clara do que será instalado antes de confirmar
@@ -73,20 +115,27 @@ O script detecta automaticamente o Dell XPS 13 Plus e oferece configurações es
 # Execução padrão com menu interativo
 ./post-omarchy-setup.sh
 
+# Modo DEBUG (simula instalações sem executar)
+./post-omarchy-setup.sh --debug
+
 # Execução sem menu (usa configurações padrão)
 ./post-omarchy-setup.sh --no-menu
+
+# Combinar opções
+./post-omarchy-setup.sh --debug --no-menu
 
 # Com variáveis de ambiente customizadas
 HYPR_SRC_DIR=/path/to/my/dotfiles/hypr ./post-omarchy-setup.sh
 ```
 
-### Opções do Menu
+### Controles do Menu Interativo
 
-- **Números (1-13)**: Marcar/desmarcar componentes individuais
-- **a**: Marcar/desmarcar todos
-- **r**: Selecionar configuração recomendada (essenciais)
-- **d**: Selecionar configuração de desenvolvimento completo
-- **x**: Prosseguir com a instalação
+- **↑/↓**: Navegar entre opções
+- **Espaço**: Marcar/desmarcar item selecionado
+- **Enter**: Confirmar seleção e prosseguir
+- **a**: Marcar/desmarcar todos os itens
+- **r**: Aplicar perfil recomendado (essenciais)
+- **d**: Aplicar perfil de desenvolvimento completo
 - **q**: Sair sem instalar
 
 ### Variáveis de Configuração
@@ -108,6 +157,8 @@ HYPRL_DST_DIR="$HOME/.config/hyprl"  # Destino Hyprl
 
 ### Recursos de Segurança
 
+- **DNS Temporário**: Configura automaticamente DNS (8.8.8.8, 1.1.1.1) durante a execução e restaura ao final
+- **Modo Debug**: Use `--debug` para simular todas as instalações sem executar comandos reais
 - **Modo fail-safe**: Script usa `set -euo pipefail` para parar em erros
 - **Verificação de privilégios**: Requer sudo mas não deve ser executado como root
 - **Yay sem root**: O script evita usar yay com sudo (usa --sudoloop para solicitar senha quando necessário)

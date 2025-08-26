@@ -9,6 +9,27 @@ set -euo pipefail
 # - Configura mise (já instalado): Node LTS + .NET 8/9
 # ======================================
 
+# Modo debug (simulação sem instalação real)
+DEBUG_MODE=false
+FORCE_XPS=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --debug)
+      DEBUG_MODE=true
+      echo "🐛 MODO DEBUG ATIVADO - Simulação apenas, nada será instalado"
+      ;;
+    --xps)
+      FORCE_XPS=true
+      echo "💻 MODO XPS ATIVADO - Simulando Dell XPS 13 Plus"
+      ;;
+  esac
+done
+
+if [[ "$DEBUG_MODE" == true ]] || [[ "$FORCE_XPS" == true ]]; then
+  sleep 2
+fi
+
 # Arrays para tracking de instalações
 INSTALLED_PACKAGES=()
 FAILED_PACKAGES=()
@@ -47,7 +68,17 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+BG_BLUE='\033[44m'
+# Cores da Exato Digital
+EXATO_CYAN='\033[96m'  # Turquesa/Ciano (cor principal)
+EXATO_YELLOW='\033[93m' # Amarelo (cor secundária)
+EXATO_DARK='\033[90m'  # Cinza escuro
+BOLD='\033[1m'
 NC='\033[0m' # No Color
+
+# Índice selecionado no menu
+SELECTED_INDEX=0
 
 log() { printf "${GREEN}[ OK ]${NC} %s\n" "$*"; }
 info() { printf "${BLUE}[ .. ]${NC} %s\n" "$*"; }
@@ -66,72 +97,132 @@ detect_hardware() {
 # Menu de seleção com checkboxes
 show_menu() {
   clear
-  echo -e "${CYAN}========================================${NC}"
-  echo -e "${CYAN}     Omarchy Post-Install Setup${NC}"
-  echo -e "${CYAN}========================================${NC}"
+  echo
+  echo -e "        ${EXATO_YELLOW}███████╗██╗  ██╗ █████╗ ██████╗  ██████╗██╗  ██╗${NC}"
+  echo -e "        ${EXATO_YELLOW}██╔════╝╚██╗██╔╝██╔══██╗██╔══██╗██╔════╝██║  ██║${NC}"
+  echo -e "        ${EXATO_YELLOW}█████╗   ╚███╔╝ ███████║██████╔╝██║     ███████║${NC}"
+  echo -e "        ${EXATO_YELLOW}██╔══╝   ██╔██╗ ██╔══██║██╔══██╗██║     ██╔══██║${NC}"
+  echo -e "        ${EXATO_YELLOW}███████╗██╔╝ ██╗██║  ██║██║  ██║╚██████╗██║  ██║${NC}"
+  echo -e "        ${EXATO_YELLOW}╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝${NC}"
+  echo
+  echo -e "               ${EXATO_CYAN}██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗${NC}"
+  echo -e "               ${EXATO_CYAN}██║     ██║████╗  ██║██║   ██║╚██╗██╔╝${NC}"
+  echo -e "               ${EXATO_CYAN}██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝${NC}"
+  echo -e "               ${EXATO_CYAN}██║     ██║██║╚██╗██║██║   ██║ ██╔██╗${NC}"
+  echo -e "               ${EXATO_CYAN}███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗${NC}"
+  echo -e "               ${EXATO_CYAN}╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝${NC}"
+  echo
+  echo -e "${EXATO_CYAN}═══════════════════════════════════════════════════════════════════${NC}"
+  local title="Omarchy Post-Install Setup"
+  local prefix=""
+  
+  if [[ "$DEBUG_MODE" == true ]]; then
+    prefix="${BOLD}${RED}🐛 DEBUG MODE${NC}"
+  fi
+  
+  if [[ "$FORCE_XPS" == true ]] || [[ "$hw_model" == *"XPS"* ]]; then
+    if [[ -n "$prefix" ]]; then
+      prefix="$prefix ${BOLD}${YELLOW}💻 XPS 9320${NC}"
+    else
+      prefix="${BOLD}${YELLOW}💻 XPS 9320${NC}"
+    fi
+  fi
+  
+  if [[ -n "$prefix" ]]; then
+    echo -e "$prefix ${BOLD}- $title${NC}"
+  else
+    echo -e "${BOLD}              $title${NC}"
+  fi
+  echo -e "${EXATO_CYAN}═══════════════════════════════════════════════════════════════════${NC}"
   echo
   
   # Detectar hardware
   local hw_model
   hw_model=$(detect_hardware)
-  if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]]; then
+  if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo -e "${YELLOW}🔍 Hardware detectado: Dell XPS 13 Plus (9320)${NC}"
     echo -e "${YELLOW}   Configuração específica disponível!${NC}"
     echo
   fi
   
-  echo -e "${PURPLE}Selecione os componentes para instalar:${NC}"
+  echo -e "${BOLD}Selecione os componentes para instalar:${NC}"
+  echo -e "${EXATO_DARK}(Números separados por espaço: '1 3 5', Seções: 10=apps, 20=jetbrains, 30=dev, 40=config)${NC}"
+  echo -e "${EXATO_DARK}(Atalhos: a=todos, r=recomendados, d=desenvolvimento, x=continuar, q=sair)${NC}"
   echo
-  echo -e "${GREEN}📦 Aplicações:${NC}"
-  echo -e "  1) [$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo '✓' || echo ' ')] Google Chrome - Navegador web"
-  echo -e "  2) [$([ "$INSTALL_COPYQ" == true ] && echo '✓' || echo ' ')] CopyQ - Gerenciador de clipboard"
-  echo -e "  3) [$([ "$INSTALL_DROPBOX" == true ] && echo '✓' || echo ' ')] Dropbox - Sincronização de arquivos"
-  echo -e "  4) [$([ "$INSTALL_AWS_VPN" == true ] && echo '✓' || echo ' ')] AWS VPN Client"
-  echo -e "  5) [$([ "$INSTALL_POSTMAN" == true ] && echo '✓' || echo ' ')] Postman - Teste de APIs"
+  
+  local num=1
+  
   echo
-  echo -e "${GREEN}🛠️ JetBrains IDEs:${NC}"
-  echo -e "  6) [$([ "$INSTALL_JB_TOOLBOX" == true ] && echo '✓' || echo ' ')] JetBrains Toolbox"
-  echo -e "  7) [$([ "$INSTALL_JB_RIDER" == true ] && echo '✓' || echo ' ')] Rider - IDE para .NET"
-  echo -e "  8) [$([ "$INSTALL_JB_DATAGRIP" == true ] && echo '✓' || echo ' ')] DataGrip - IDE para bancos de dados"
+  echo -e "${GREEN}📦 Aplicações ${EXATO_YELLOW}[10]${NC}:${NC}"
+  echo -e "  ${num}) [$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo '✓' || echo ' ')] Google Chrome - Navegador web"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_COPYQ" == true ] && echo '✓' || echo ' ')] CopyQ - Gerenciador de clipboard"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_DROPBOX" == true ] && echo '✓' || echo ' ')] Dropbox - Sincronização de arquivos"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_AWS_VPN" == true ] && echo '✓' || echo ' ')] AWS VPN Client"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_POSTMAN" == true ] && echo '✓' || echo ' ')] Postman - Teste de APIs"; ((num++))
+  
   echo
-  echo -e "${GREEN}🚀 Desenvolvimento:${NC}"
-  echo -e "  9) [$([ "$INSTALL_CURSOR" == true ] && echo '✓' || echo ' ')] Cursor - IDE com IA integrada"
-  echo -e " 10) [$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo '✓' || echo ' ')] Mise Runtimes (Node.js LTS + .NET 8/9)"
-  echo -e " 11) [$([ "$INSTALL_CLAUDE_CODE" == true ] && echo '✓' || echo ' ')] Claude Code CLI"
+  echo -e "${GREEN}🛠️ JetBrains IDEs ${EXATO_YELLOW}[20]${NC}:${NC}"
+  echo -e "  ${num}) [$([ "$INSTALL_JB_TOOLBOX" == true ] && echo '✓' || echo ' ')] JetBrains Toolbox"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_JB_RIDER" == true ] && echo '✓' || echo ' ')] Rider - IDE para .NET"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_JB_DATAGRIP" == true ] && echo '✓' || echo ' ')] DataGrip - IDE para bancos de dados"; ((num++))
+  
   echo
-  echo -e "${GREEN}⚙️ Configurações:${NC}"
-  echo -e " 12) [$([ "$SYNC_HYPR_CONFIGS" == true ] && echo '✓' || echo ' ')] Sincronizar configurações Hypr/Hyprl"
+  echo -e "${GREEN}🚀 Desenvolvimento ${EXATO_YELLOW}[30]${NC}:${NC}"
+  echo -e "  ${num}) [$([ "$INSTALL_CURSOR" == true ] && echo '✓' || echo ' ')] Cursor - IDE com IA integrada"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo '✓' || echo ' ')] Mise Runtimes (Node.js LTS + .NET 8/9)"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_CLAUDE_CODE" == true ] && echo '✓' || echo ' ')] Claude Code CLI"; ((num++))
+  
   echo
-  if [[ "$hw_model" == *"XPS"* ]]; then
-    echo -e "${GREEN}💻 Hardware Específico:${NC}"
-    echo -e " 13) [$([ "$SETUP_DELL_XPS_9320" == true ] && echo '✓' || echo ' ')] Configurar Dell XPS 13 Plus (webcam + otimizações)"
+  echo -e "${GREEN}⚙️ Configurações ${EXATO_YELLOW}[40]${NC}:${NC}"
+  echo -e " ${num}) [$([ "$SYNC_HYPR_CONFIGS" == true ] && echo '✓' || echo ' ')] Sincronizar configurações Hypr/Hyprl"; ((num++))
+  
+  if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo
+    echo -e "${GREEN}💻 Hardware Específico ${EXATO_YELLOW}[50]${NC}:${NC}"
+    echo -e " ${num}) [$([ "$SETUP_DELL_XPS_9320" == true ] && echo '✓' || echo ' ')] Configurar Dell XPS 13 Plus (webcam + otimizações)"
   fi
-  echo -e "${CYAN}----------------------------------------${NC}"
-  echo -e "  a) Marcar/Desmarcar todos"
-  echo -e "  r) Recomendados (aplicações essenciais)"
-  echo -e "  d) Desenvolvimento completo"
-  echo -e "  x) Prosseguir com a instalação"
-  echo -e "  q) Sair"
+  
   echo
-  echo -n "Escolha uma opção: "
+  echo -e "${EXATO_CYAN}════════════════════════════════════════${NC}"
+  echo -e "Atalhos: ${EXATO_YELLOW}a${NC} marcar todos | ${EXATO_YELLOW}r${NC} recomendados | ${EXATO_YELLOW}d${NC} desenvolvimento completo"
+  echo
+}
+
+# Atualizar estados das variáveis baseado no índice
+update_states_from_array() {
+  local states=("$@")
+  INSTALL_GOOGLE_CHROME="${states[0]}"
+  INSTALL_COPYQ="${states[1]}"
+  INSTALL_DROPBOX="${states[2]}"
+  INSTALL_AWS_VPN="${states[3]}"
+  INSTALL_POSTMAN="${states[4]}"
+  INSTALL_JB_TOOLBOX="${states[5]}"
+  INSTALL_JB_RIDER="${states[6]}"
+  INSTALL_JB_DATAGRIP="${states[7]}"
+  INSTALL_CURSOR="${states[8]}"
+  INSTALL_MISE_RUNTIMES="${states[9]}"
+  INSTALL_CLAUDE_CODE="${states[10]}"
+  SYNC_HYPR_CONFIGS="${states[11]}"
+  if [[ ${#states[@]} -gt 12 ]]; then
+    SETUP_DELL_XPS_9320="${states[12]}"
+  fi
 }
 
 toggle_option() {
   case "$1" in
-    1) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
-    2) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
-    3) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
-    4) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
-    5) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
-    6) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
-    7) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
-    8) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
-    9) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    10) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    11) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    12) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    13) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    0) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
+    1) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
+    2) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
+    3) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
+    4) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
+    5) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
+    6) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
+    7) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
+    8) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    9) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    10) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    11) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    12) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -186,25 +277,181 @@ toggle_option() {
 }
 
 interactive_menu() {
+  local hw_model
+  hw_model=$(detect_hardware)
+  
+  # Auto-configurar para Dell XPS 13 Plus
+  if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]] || [[ "$FORCE_XPS" == true ]]; then
+    echo -e "${YELLOW}🔍 Dell XPS 13 Plus detectado - Marcando configurações de hardware específicas...${NC}"
+    SETUP_DELL_XPS_9320=true  # Auto-marcar apenas configuração XPS
+    sleep 1
+  fi
+  
   while true; do
     show_menu
+    
+    echo
+    echo -n "Digite uma opção: "
     read -r choice
+    
     case "$choice" in
-      [1-9]|1[0-3]) toggle_option "$choice" ;;
-      a|A|r|R|d|D) toggle_option "$choice" ;;
-      x|X) break ;;
-      q|Q) 
+      10) # Seção Aplicações (1-5)
+        echo "Alternando seção Aplicações..."
+        local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
+        INSTALL_GOOGLE_CHROME=$state
+        INSTALL_COPYQ=$state
+        INSTALL_DROPBOX=$state
+        INSTALL_AWS_VPN=$state
+        INSTALL_POSTMAN=$state
+        ;;
+      20) # Seção JetBrains (6-8)
+        echo "Alternando seção JetBrains..."
+        local state=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true)
+        INSTALL_JB_TOOLBOX=$state
+        INSTALL_JB_RIDER=$state
+        INSTALL_JB_DATAGRIP=$state
+        ;;
+      30) # Seção Desenvolvimento (9-11)
+        echo "Alternando seção Desenvolvimento..."
+        local state=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true)
+        INSTALL_CURSOR=$state
+        INSTALL_MISE_RUNTIMES=$state
+        INSTALL_CLAUDE_CODE=$state
+        ;;
+      40) # Seção Configurações (12)
+        echo "Alternando seção Configurações..."
+        SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true)
+        ;;
+      50) # Seção Hardware (13) - se aplicável
+        if [[ "$hw_model" == *"XPS"* ]]; then
+          echo "Alternando seção Hardware..."
+          SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true)
+        fi
+        ;;
+      *[0-9]*) # Números individuais ou múltiplos
+        # Dividir entrada por espaços e processar cada número
+        for num in $choice; do
+          if [[ "$num" =~ ^[1-9]$|^1[0-3]$ ]]; then
+            local index=$((num - 1))
+            toggle_option "$index"
+          fi
+        done
+        ;;
+      a|A) # Marcar/desmarcar todos
+        local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
+        INSTALL_GOOGLE_CHROME=$state
+        INSTALL_COPYQ=$state
+        INSTALL_DROPBOX=$state
+        INSTALL_AWS_VPN=$state
+        INSTALL_POSTMAN=$state
+        INSTALL_JB_TOOLBOX=$state
+        INSTALL_JB_RIDER=$state
+        INSTALL_JB_DATAGRIP=$state
+        INSTALL_CURSOR=$state
+        INSTALL_MISE_RUNTIMES=$state
+        INSTALL_CLAUDE_CODE=$state
+        SYNC_HYPR_CONFIGS=$state
+        if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
+          SETUP_DELL_XPS_9320=$state
+        fi
+        ;;
+      r|R) # Recomendados
+        INSTALL_GOOGLE_CHROME=true
+        INSTALL_COPYQ=true
+        INSTALL_DROPBOX=true
+        INSTALL_AWS_VPN=false
+        INSTALL_POSTMAN=false
+        INSTALL_JB_TOOLBOX=false
+        INSTALL_JB_RIDER=false
+        INSTALL_JB_DATAGRIP=false
+        INSTALL_CURSOR=false
+        INSTALL_MISE_RUNTIMES=true
+        INSTALL_CLAUDE_CODE=true
+        SYNC_HYPR_CONFIGS=true
+        SETUP_DELL_XPS_9320=false
+        ;;
+      d|D) # Desenvolvimento completo
+        INSTALL_GOOGLE_CHROME=true
+        INSTALL_COPYQ=true
+        INSTALL_DROPBOX=true
+        INSTALL_AWS_VPN=true
+        INSTALL_POSTMAN=true
+        INSTALL_JB_TOOLBOX=false
+        INSTALL_JB_RIDER=true
+        INSTALL_JB_DATAGRIP=true
+        INSTALL_CURSOR=true
+        INSTALL_MISE_RUNTIMES=true
+        INSTALL_CLAUDE_CODE=true
+        SYNC_HYPR_CONFIGS=true
+        if [[ "$hw_model" == *"XPS"* ]]; then
+          SETUP_DELL_XPS_9320=true
+        fi
+        ;;
+      x|X) # Prosseguir
+        break
+        ;;
+      q|Q) # Sair
         echo "Saindo..."
         exit 0
         ;;
-      *) echo "Opção inválida!" ; sleep 1 ;;
+      *) 
+        echo "Opção inválida!"
+        sleep 1
+        ;;
     esac
   done
+}
+
+# Configurar DNS temporário para a sessão
+setup_temporary_dns() {
+  info "Configurando DNS temporário (8.8.8.8, 1.1.1.1) para esta sessão..."
+  
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] DNS temporário simulado"
+    return 0
+  fi
+  
+  # Salvar resolv.conf original
+  if [[ -f /etc/resolv.conf ]]; then
+    sudo cp /etc/resolv.conf /tmp/resolv.conf.backup.$$
+    log "Backup do resolv.conf salvo em /tmp/resolv.conf.backup.$$"
+  fi
+  
+  # Configurar DNS temporário
+  echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" | sudo tee /tmp/resolv.conf.temp > /dev/null
+  sudo mount --bind /tmp/resolv.conf.temp /etc/resolv.conf
+  
+  log "DNS temporário configurado (8.8.8.8, 1.1.1.1)"
+  
+  # Registrar cleanup function
+  trap restore_dns EXIT
+}
+
+# Restaurar DNS original
+restore_dns() {
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Restauração de DNS simulada"
+    return 0
+  fi
+  
+  if [[ -f /tmp/resolv.conf.backup.$$ ]]; then
+    info "Restaurando DNS original..."
+    sudo umount /etc/resolv.conf 2>/dev/null || true
+    sudo mv /tmp/resolv.conf.backup.$$ /etc/resolv.conf
+    log "DNS original restaurado"
+  fi
+  
+  # Limpar arquivo temporário
+  sudo rm -f /tmp/resolv.conf.temp
 }
 
 require_sudo() {
   if [[ ${EUID:-0} -eq 0 ]]; then
     warn "Execute este script como usuário normal (não root)."
+  fi
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Sudo check simulado"
+    return 0
   fi
   if ! sudo -v; then
     err "sudo requerido."
@@ -214,8 +461,14 @@ require_sudo() {
 
 ensure_tools() {
   info "Atualizando índices do pacman e garantindo dependências base"
-  sudo pacman -Sy --noconfirm --needed base-devel git curl jq ca-certificates unzip rsync
-  log "Pacotes base OK"
+  
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Instalação de ferramentas base simulada"
+    log "[DEBUG] Pacotes base OK (simulado)"
+  else
+    sudo pacman -Sy --noconfirm --needed base-devel git curl jq ca-certificates unzip rsync
+    log "Pacotes base OK"
+  fi
 
   if ! command -v yay >/dev/null 2>&1; then
     err "yay não encontrado. O Omarchy deveria trazer o yay. Aborte ou instale o yay manualmente."
@@ -226,6 +479,13 @@ ensure_tools() {
 
 pac() {
   local pkg="$1"
+  
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Instalação simulada: pacman -S $@"
+    INSTALLED_PACKAGES+=("$pkg (pacman) [DEBUG]")
+    return 0
+  fi
+  
   if sudo pacman -S --noconfirm --needed "$@"; then
     INSTALLED_PACKAGES+=("$pkg (pacman)")
   else
@@ -236,6 +496,13 @@ pac() {
 
 aur() {
   local pkg="$1"
+  
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Instalação simulada: yay -S $@"
+    INSTALLED_PACKAGES+=("$pkg (AUR) [DEBUG]")
+    return 0
+  fi
+  
   if yay -S --noconfirm --needed --sudoloop "$@" 2>&1 | grep -v "cannot use yay as root"; then
     INSTALLED_PACKAGES+=("$pkg (AUR)")
   else
@@ -246,6 +513,11 @@ aur() {
 
 setup_dell_xps_9320_webcam() {
   info "Configurando webcam para Dell XPS 13 Plus (9320)"
+  
+  # Instalar dependências essenciais primeiro
+  info "Instalando libcamera e pipewire-libcamera (obrigatórios para webcam)..."
+  pac libcamera || warn "Falha ao instalar libcamera"
+  pac pipewire-libcamera || warn "Falha ao instalar pipewire-libcamera"
   
   # Instalar ivsc-driver do AUR
   info "Instalando driver IVSC para webcam..."
@@ -608,6 +880,11 @@ print_summary() {
     echo "   - A webcam pode precisar de reinicialização para funcionar"
     echo "   - Execute 'sudo dmesg | grep -i ipu6' para verificar o status"
     echo "   - Use 'v4l2-ctl --list-devices' para listar dispositivos de vídeo"
+    echo
+    echo -e "${YELLOW}📌 IMPORTANTE para Chromium/Chrome usar a webcam:${NC}"
+    echo "   - Adicione a flag: --enable-features=WebRTCPipeWireCapturer"
+    echo "   - Para Chrome/Chromium permanente, edite o .desktop ou crie alias:"
+    echo "     alias chromium='chromium --enable-features=WebRTCPipeWireCapturer'"
   fi
   
   if [[ "$INSTALL_AWS_VPN" == true ]]; then
@@ -620,8 +897,18 @@ print_summary() {
 }
 
 main() {
+  # Configurar DNS temporário no início
+  setup_temporary_dns
+  
   # Verificar se deve rodar em modo interativo
-  if [[ "$#" -eq 0 ]] || [[ "$1" != "--no-menu" ]]; then
+  local no_menu=false
+  for arg in "$@"; do
+    if [[ "$arg" == "--no-menu" ]]; then
+      no_menu=true
+    fi
+  done
+  
+  if [[ "$no_menu" == false ]]; then
     interactive_menu
   fi
   
