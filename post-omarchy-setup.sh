@@ -46,6 +46,8 @@ INSTALL_JB_TOOLBOX=false
 INSTALL_JB_RIDER=false
 INSTALL_JB_DATAGRIP=false
 INSTALL_CURSOR=false
+INSTALL_VSCODE=false
+INSTALL_WINDSURF=false
 INSTALL_MISE_RUNTIMES=false
 INSTALL_CLAUDE_CODE=false
 SYNC_HYPR_CONFIGS=false
@@ -169,6 +171,8 @@ show_menu() {
   echo
   echo -e "${GREEN}🚀 Desenvolvimento ${EXATO_YELLOW}[30]${NC}:${NC}"
   echo -e "  ${num}) [$([ "$INSTALL_CURSOR" == true ] && echo '✓' || echo ' ')] Cursor - IDE com IA integrada"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_VSCODE" == true ] && echo '✓' || echo ' ')] Visual Studio Code"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_WINDSURF" == true ] && echo '✓' || echo ' ')] Windsurf IDE"; ((num++))
   echo -e " ${num}) [$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo '✓' || echo ' ')] Mise Runtimes (Node.js LTS + .NET 8/9)"; ((num++))
   echo -e " ${num}) [$([ "$INSTALL_CLAUDE_CODE" == true ] && echo '✓' || echo ' ')] Claude Code CLI"; ((num++))
   
@@ -200,11 +204,13 @@ update_states_from_array() {
   INSTALL_JB_RIDER="${states[6]}"
   INSTALL_JB_DATAGRIP="${states[7]}"
   INSTALL_CURSOR="${states[8]}"
-  INSTALL_MISE_RUNTIMES="${states[9]}"
-  INSTALL_CLAUDE_CODE="${states[10]}"
-  SYNC_HYPR_CONFIGS="${states[11]}"
-  if [[ ${#states[@]} -gt 12 ]]; then
-    SETUP_DELL_XPS_9320="${states[12]}"
+  INSTALL_VSCODE="${states[9]}"
+  INSTALL_WINDSURF="${states[10]}"
+  INSTALL_MISE_RUNTIMES="${states[11]}"
+  INSTALL_CLAUDE_CODE="${states[12]}"
+  SYNC_HYPR_CONFIGS="${states[13]}"
+  if [[ ${#states[@]} -gt 14 ]]; then
+    SETUP_DELL_XPS_9320="${states[14]}"
   fi
 }
 
@@ -219,10 +225,12 @@ toggle_option() {
     6) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
     7) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
     8) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    9) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    10) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    11) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    12) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    9) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    10) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
+    11) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    12) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    13) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    14) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -311,10 +319,12 @@ interactive_menu() {
         INSTALL_JB_RIDER=$state
         INSTALL_JB_DATAGRIP=$state
         ;;
-      30) # Seção Desenvolvimento (9-11)
+      30) # Seção Desenvolvimento (9-13)
         echo "Alternando seção Desenvolvimento..."
         local state=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true)
         INSTALL_CURSOR=$state
+        INSTALL_VSCODE=$state
+        INSTALL_WINDSURF=$state
         INSTALL_MISE_RUNTIMES=$state
         INSTALL_CLAUDE_CODE=$state
         ;;
@@ -331,7 +341,7 @@ interactive_menu() {
       *[0-9]*) # Números individuais ou múltiplos
         # Dividir entrada por espaços e processar cada número
         for num in $choice; do
-          if [[ "$num" =~ ^[1-9]$|^1[0-3]$ ]]; then
+          if [[ "$num" =~ ^[1-9]$|^1[0-5]$ ]]; then
             local index=$((num - 1))
             toggle_option "$index"
           fi
@@ -348,6 +358,8 @@ interactive_menu() {
         INSTALL_JB_RIDER=$state
         INSTALL_JB_DATAGRIP=$state
         INSTALL_CURSOR=$state
+        INSTALL_VSCODE=$state
+        INSTALL_WINDSURF=$state
         INSTALL_MISE_RUNTIMES=$state
         INSTALL_CLAUDE_CODE=$state
         SYNC_HYPR_CONFIGS=$state
@@ -365,6 +377,8 @@ interactive_menu() {
         INSTALL_JB_RIDER=false
         INSTALL_JB_DATAGRIP=false
         INSTALL_CURSOR=false
+        INSTALL_VSCODE=false
+        INSTALL_WINDSURF=false
         INSTALL_MISE_RUNTIMES=true
         INSTALL_CLAUDE_CODE=true
         SYNC_HYPR_CONFIGS=true
@@ -380,6 +394,8 @@ interactive_menu() {
         INSTALL_JB_RIDER=true
         INSTALL_JB_DATAGRIP=true
         INSTALL_CURSOR=true
+        INSTALL_VSCODE=true
+        INSTALL_WINDSURF=false
         INSTALL_MISE_RUNTIMES=true
         INSTALL_CLAUDE_CODE=true
         SYNC_HYPR_CONFIGS=true
@@ -640,16 +656,19 @@ install_core_apps() {
   
   if [[ "$INSTALL_DROPBOX" == true ]]; then
     info "Instalando Dropbox..."
-    aur dropbox || warn "Falha no dropbox (AUR)"
-    # Habilitar Dropbox (systemd --user) caso disponível
-    if systemctl --user daemon-reload 2>/dev/null; then
-      systemctl --user enable --now dropbox.service || warn "Não foi possível habilitar dropbox.service (user)"
+    if aur dropbox; then
+      # Dropbox AUR package não inclui serviço systemd
+      # Usuário deve iniciar manualmente ou configurar autostart
+      info "Dropbox instalado. Para iniciar: dropbox start -i"
+      CONFIGURED_RUNTIMES+=("Dropbox (instalar manualmente: dropbox start -i)")
+    else
+      warn "Falha no dropbox (AUR)"
     fi
   fi
   
   if [[ "$INSTALL_AWS_VPN" == true ]]; then
     info "Instalando AWS VPN Client..."
-    if aur aws-vpn-client || aur awsvpnclient; then
+    if aur awsvpnclient; then
       # Configurar systemd-resolved se necessário
       info "Configurando serviços para AWS VPN Client..."
       
@@ -693,6 +712,16 @@ install_core_apps() {
     info "Instalando Cursor IDE..."
     aur cursor-bin || warn "Falha no Cursor (AUR)"
   fi
+  
+  if [[ "$INSTALL_VSCODE" == true ]]; then
+    info "Instalando Visual Studio Code..."
+    aur visual-studio-code-bin || warn "Falha no VSCode (AUR)"
+  fi
+  
+  if [[ "$INSTALL_WINDSURF" == true ]]; then
+    info "Instalando Windsurf IDE..."
+    aur windsurf-bin || warn "Falha no Windsurf (AUR)"
+  fi
 }
 
 activate_mise_in_shell() {
@@ -718,6 +747,10 @@ configure_mise_runtimes() {
   # Verificar se Node já está instalado
   if mise list node 2>/dev/null | grep -q "node.*${DEFAULT_NODE}"; then
     info "Node ${DEFAULT_NODE} já instalado via mise"
+    # Verificar se há atualizações disponíveis
+    info "Verificando atualizações para Node ${DEFAULT_NODE}..."
+    mise install "node@${DEFAULT_NODE}" 2>/dev/null || true
+    mise use -g "node@${DEFAULT_NODE}" 2>/dev/null || warn "Falha em definir node@${DEFAULT_NODE} como global"
     SKIPPED_PACKAGES+=("node@${DEFAULT_NODE}")
   else
     info "Instalando Node via mise: ${DEFAULT_NODE}"
@@ -929,6 +962,8 @@ main() {
   [[ "$INSTALL_JB_RIDER" == true ]] && echo "  • Rider"
   [[ "$INSTALL_JB_DATAGRIP" == true ]] && echo "  • DataGrip"
   [[ "$INSTALL_CURSOR" == true ]] && echo "  • Cursor IDE"
+  [[ "$INSTALL_VSCODE" == true ]] && echo "  • Visual Studio Code"
+  [[ "$INSTALL_WINDSURF" == true ]] && echo "  • Windsurf IDE"
   [[ "$INSTALL_MISE_RUNTIMES" == true ]] && echo "  • Mise Runtimes (Node.js + .NET)"
   [[ "$INSTALL_CLAUDE_CODE" == true ]] && echo "  • Claude Code CLI"
   [[ "$SYNC_HYPR_CONFIGS" == true ]] && echo "  • Sincronizar configs Hypr"
