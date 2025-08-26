@@ -50,6 +50,8 @@ INSTALL_VSCODE=false
 INSTALL_WINDSURF=false
 INSTALL_MISE_RUNTIMES=false
 INSTALL_CLAUDE_CODE=false
+INSTALL_CODEX_CLI=false
+INSTALL_GEMINI_CLI=false
 SYNC_HYPR_CONFIGS=false
 SETUP_DELL_XPS_9320=false
 
@@ -175,6 +177,8 @@ show_menu() {
   echo -e " ${num}) [$([ "$INSTALL_WINDSURF" == true ] && echo '✓' || echo ' ')] Windsurf IDE"; ((num++))
   echo -e " ${num}) [$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo '✓' || echo ' ')] Mise Runtimes (Node.js LTS + .NET 8/9)"; ((num++))
   echo -e " ${num}) [$([ "$INSTALL_CLAUDE_CODE" == true ] && echo '✓' || echo ' ')] Claude Code CLI"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_CODEX_CLI" == true ] && echo '✓' || echo ' ')] Codex CLI - OpenAI"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_GEMINI_CLI" == true ] && echo '✓' || echo ' ')] Gemini CLI - Google"; ((num++))
   
   echo
   echo -e "${GREEN}⚙️ Configurações ${EXATO_YELLOW}[40]${NC}:${NC}"
@@ -208,9 +212,11 @@ update_states_from_array() {
   INSTALL_WINDSURF="${states[10]}"
   INSTALL_MISE_RUNTIMES="${states[11]}"
   INSTALL_CLAUDE_CODE="${states[12]}"
-  SYNC_HYPR_CONFIGS="${states[13]}"
-  if [[ ${#states[@]} -gt 14 ]]; then
-    SETUP_DELL_XPS_9320="${states[14]}"
+  INSTALL_CODEX_CLI="${states[13]}"
+  INSTALL_GEMINI_CLI="${states[14]}"
+  SYNC_HYPR_CONFIGS="${states[15]}"
+  if [[ ${#states[@]} -gt 16 ]]; then
+    SETUP_DELL_XPS_9320="${states[16]}"
   fi
 }
 
@@ -229,8 +235,10 @@ toggle_option() {
     10) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
     11) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
     12) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    13) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    14) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    13) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    14) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
+    15) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    16) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -242,8 +250,12 @@ toggle_option() {
       INSTALL_JB_RIDER=$state
       INSTALL_JB_DATAGRIP=$state
       INSTALL_CURSOR=$state
+      INSTALL_VSCODE=$state
+      INSTALL_WINDSURF=$state
       INSTALL_MISE_RUNTIMES=$state
       INSTALL_CLAUDE_CODE=$state
+      INSTALL_CODEX_CLI=$state
+      INSTALL_GEMINI_CLI=$state
       SYNC_HYPR_CONFIGS=$state
       if [[ "$(detect_hardware)" == *"XPS"* ]]; then
         SETUP_DELL_XPS_9320=$state
@@ -259,8 +271,12 @@ toggle_option() {
       INSTALL_JB_RIDER=false
       INSTALL_JB_DATAGRIP=false
       INSTALL_CURSOR=false
+      INSTALL_VSCODE=false
+      INSTALL_WINDSURF=false
       INSTALL_MISE_RUNTIMES=true
       INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=false
+      INSTALL_GEMINI_CLI=false
       SYNC_HYPR_CONFIGS=true
       SETUP_DELL_XPS_9320=false
       ;;
@@ -274,8 +290,12 @@ toggle_option() {
       INSTALL_JB_RIDER=true
       INSTALL_JB_DATAGRIP=true
       INSTALL_CURSOR=true
+      INSTALL_VSCODE=true
+      INSTALL_WINDSURF=true
       INSTALL_MISE_RUNTIMES=true
       INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=true
+      INSTALL_GEMINI_CLI=true
       SYNC_HYPR_CONFIGS=true
       if [[ "$(detect_hardware)" == *"XPS"* ]]; then
         SETUP_DELL_XPS_9320=true
@@ -319,7 +339,7 @@ interactive_menu() {
         INSTALL_JB_RIDER=$state
         INSTALL_JB_DATAGRIP=$state
         ;;
-      30) # Seção Desenvolvimento (9-13)
+      30) # Seção Desenvolvimento (9-15)
         echo "Alternando seção Desenvolvimento..."
         local state=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true)
         INSTALL_CURSOR=$state
@@ -327,6 +347,8 @@ interactive_menu() {
         INSTALL_WINDSURF=$state
         INSTALL_MISE_RUNTIMES=$state
         INSTALL_CLAUDE_CODE=$state
+        INSTALL_CODEX_CLI=$state
+        INSTALL_GEMINI_CLI=$state
         ;;
       40) # Seção Configurações (12)
         echo "Alternando seção Configurações..."
@@ -790,8 +812,9 @@ configure_mise_runtimes() {
 }
 
 install_clis() {
-  if [[ "$INSTALL_CLAUDE_CODE" != true ]]; then
-    info "Pulando instalação do Claude Code (não selecionado)"
+  # Verificar se algum CLI foi selecionado
+  if [[ "$INSTALL_CLAUDE_CODE" != true && "$INSTALL_CODEX_CLI" != true && "$INSTALL_GEMINI_CLI" != true ]]; then
+    info "Pulando instalação de CLIs (nenhum selecionado)"
     return 0
   fi
   
@@ -802,12 +825,37 @@ install_clis() {
     return 0
   fi
 
-  info "Instalando Claude Code CLI..."
-  if npm install -g @anthropic-ai/claude-code; then
-    INSTALLED_PACKAGES+=("@anthropic-ai/claude-code (npm)")
-  else
-    warn "Falha ao instalar @anthropic-ai/claude-code"
-    FAILED_PACKAGES+=("@anthropic-ai/claude-code (npm)")
+  # Claude Code CLI
+  if [[ "$INSTALL_CLAUDE_CODE" == true ]]; then
+    info "Instalando Claude Code CLI..."
+    if npm install -g @anthropic-ai/claude-code; then
+      INSTALLED_PACKAGES+=("@anthropic-ai/claude-code (npm)")
+    else
+      warn "Falha ao instalar @anthropic-ai/claude-code"
+      FAILED_PACKAGES+=("@anthropic-ai/claude-code (npm)")
+    fi
+  fi
+
+  # Codex CLI
+  if [[ "$INSTALL_CODEX_CLI" == true ]]; then
+    info "Instalando Codex CLI..."
+    if npm install -g @openai/codex; then
+      INSTALLED_PACKAGES+=("@openai/codex (npm)")
+    else
+      warn "Falha ao instalar @openai/codex"
+      FAILED_PACKAGES+=("@openai/codex (npm)")
+    fi
+  fi
+
+  # Gemini CLI
+  if [[ "$INSTALL_GEMINI_CLI" == true ]]; then
+    info "Instalando Gemini CLI..."
+    if npm install -g @google/gemini-cli; then
+      INSTALLED_PACKAGES+=("@google/gemini-cli (npm)")
+    else
+      warn "Falha ao instalar @google/gemini-cli"
+      FAILED_PACKAGES+=("@google/gemini-cli (npm)")
+    fi
   fi
 }
 
@@ -966,6 +1014,8 @@ main() {
   [[ "$INSTALL_WINDSURF" == true ]] && echo "  • Windsurf IDE"
   [[ "$INSTALL_MISE_RUNTIMES" == true ]] && echo "  • Mise Runtimes (Node.js + .NET)"
   [[ "$INSTALL_CLAUDE_CODE" == true ]] && echo "  • Claude Code CLI"
+  [[ "$INSTALL_CODEX_CLI" == true ]] && echo "  • Codex CLI (OpenAI)"
+  [[ "$INSTALL_GEMINI_CLI" == true ]] && echo "  • Gemini CLI (Google)"
   [[ "$SYNC_HYPR_CONFIGS" == true ]] && echo "  • Sincronizar configs Hypr"
   [[ "$SETUP_DELL_XPS_9320" == true ]] && echo "  • Configurações Dell XPS 9320"
   echo
