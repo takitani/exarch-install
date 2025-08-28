@@ -48,6 +48,7 @@ INSTALL_REMMINA=true
 INSTALL_ESPANSO=true
 INSTALL_NANO=true
 INSTALL_MICRO=true
+INSTALL_KATE=true
 INSTALL_SLACK=true
 INSTALL_TEAMS=true
 INSTALL_JB_TOOLBOX=false  # Por padrão, instalar IDEs separadamente
@@ -180,6 +181,7 @@ show_menu() {
   echo -e "  ${num}) [$([ "$INSTALL_ESPANSO" == true ] && echo '✓' || echo ' ')] Espanso - Text expander (Wayland)"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_NANO" == true ] && echo '✓' || echo ' ')] Nano - Editor de texto simples"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_MICRO" == true ] && echo '✓' || echo ' ')] Micro - Editor de texto moderno"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_KATE" == true ] && echo '✓' || echo ' ')] Kate - Editor de texto avançado do KDE"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_SLACK" == true ] && echo '✓' || echo ' ')] Slack - Comunicação empresarial"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_TEAMS" == true ] && echo '✓' || echo ' ')] Microsoft Teams - Comunicação empresarial"; ((num++))
   
@@ -216,7 +218,7 @@ show_menu() {
     echo
     echo -e "${GREEN}💻 Hardware Específico ${EXATO_YELLOW}[50]${NC}:${NC}"
     echo -e " ${num}) [$([ "$SETUP_DELL_XPS_9320" == true ] && echo '✓' || echo ' ')] Configurar Dell XPS 13 Plus (webcam + otimizações)"; ((num++))
-    echo -e " ${num}) [$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo '✓' || echo ' ')] Teclados duplos: BR (padrão) + US Internacional"
+    echo -e " ${num}) [$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo '✓' || echo ' ')] Teclados duplos: BR (padrão) + US Internacional"; ((num++))
   fi
   
   echo
@@ -238,24 +240,25 @@ update_states_from_array() {
   INSTALL_ESPANSO="${states[7]}"
   INSTALL_NANO="${states[8]}"
   INSTALL_MICRO="${states[9]}"
-  INSTALL_SLACK="${states[10]}"
-  INSTALL_TEAMS="${states[11]}"
-  INSTALL_JB_TOOLBOX="${states[12]}"
-  INSTALL_JB_RIDER="${states[13]}"
-  INSTALL_JB_DATAGRIP="${states[14]}"
-  INSTALL_CURSOR="${states[15]}"
-  INSTALL_VSCODE="${states[16]}"
-  INSTALL_WINDSURF="${states[17]}"
-  INSTALL_MISE_RUNTIMES="${states[18]}"
-  INSTALL_CLAUDE_CODE="${states[19]}"
-  INSTALL_CODEX_CLI="${states[20]}"
-  INSTALL_GEMINI_CLI="${states[21]}"
-  SYNC_HYPR_CONFIGS="${states[22]}"
-  INSTALL_CHEZMOI="${states[23]}"
-  INSTALL_AGE="${states[24]}"
-  SETUP_DOTFILES_MANAGEMENT="${states[25]}"
-  if [[ ${#states[@]} -gt 26 ]]; then
-    SETUP_DELL_XPS_9320="${states[26]}"
+  INSTALL_KATE="${states[10]}"
+  INSTALL_SLACK="${states[11]}"
+  INSTALL_TEAMS="${states[12]}"
+  INSTALL_JB_TOOLBOX="${states[13]}"
+  INSTALL_JB_RIDER="${states[14]}"
+  INSTALL_JB_DATAGRIP="${states[15]}"
+  INSTALL_CURSOR="${states[16]}"
+  INSTALL_VSCODE="${states[17]}"
+  INSTALL_WINDSURF="${states[18]}"
+  INSTALL_MISE_RUNTIMES="${states[19]}"
+  INSTALL_CLAUDE_CODE="${states[20]}"
+  INSTALL_CODEX_CLI="${states[21]}"
+  INSTALL_GEMINI_CLI="${states[22]}"
+  SYNC_HYPR_CONFIGS="${states[23]}"
+  INSTALL_CHEZMOI="${states[24]}"
+  INSTALL_AGE="${states[25]}"
+  SETUP_DOTFILES_MANAGEMENT="${states[26]}"
+  if [[ ${#states[@]} -gt 27 ]]; then
+    SETUP_DELL_XPS_9320="${states[27]}"
   fi
 }
 
@@ -271,30 +274,31 @@ toggle_option() {
     7) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
     8) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
     9) INSTALL_MICRO=$([ "$INSTALL_MICRO" == true ] && echo false || echo true) ;;
-    10) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
-    11) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
-    12) 
+    10) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
+    11) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
+    12) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    13) 
       INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true)
       ;;
-    13) 
+    14) 
       INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true)
       ;;
-    14) 
+    15) 
       INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true)
       ;;
-    15) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    16) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
-    17) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
-    18) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    19) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    20) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
-    21) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    22) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    23) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    24) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    25) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    26) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    27) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    16) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    17) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    18) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
+    19) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    20) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    21) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    22) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
+    23) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    24) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    25) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    26) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    27) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    28) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -318,8 +322,9 @@ toggle_option() {
         INSTALL_CHEZMOI=$state
         INSTALL_AGE=$state
         SETUP_DOTFILES_MANAGEMENT=$state
-        if [[ "$(detect_hardware)" == *"XPS"* ]]; then
+        if [[ "$(detect_hardware)" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
           SETUP_DELL_XPS_9320=$state
+          SETUP_DUAL_KEYBOARD=$state
         fi
       ;;
     r|R)
@@ -361,8 +366,9 @@ toggle_option() {
       INSTALL_CHEZMOI=true
       INSTALL_AGE=true
       SETUP_DOTFILES_MANAGEMENT=true
-      if [[ "$(detect_hardware)" == *"XPS"* ]]; then
+      if [[ "$(detect_hardware)" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
         SETUP_DELL_XPS_9320=true
+        SETUP_DUAL_KEYBOARD=true
       fi
       ;;
   esac
@@ -375,7 +381,8 @@ interactive_menu() {
   # Auto-configurar para Dell XPS 13 Plus
   if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo -e "${YELLOW}🔍 Dell XPS 13 Plus detectado - Marcando configurações de hardware específicas...${NC}"
-    SETUP_DELL_XPS_9320=true  # Auto-marcar apenas configuração XPS
+    SETUP_DELL_XPS_9320=true    # Auto-marcar configuração XPS
+    SETUP_DUAL_KEYBOARD=true    # Auto-marcar teclados duplos
     sleep 1
   fi
   
@@ -400,6 +407,7 @@ interactive_menu() {
         INSTALL_ESPANSO=$state
         INSTALL_NANO=$state
         INSTALL_MICRO=$state
+        INSTALL_KATE=$state
         INSTALL_SLACK=$state
         INSTALL_TEAMS=$state
         ;;
@@ -430,7 +438,7 @@ interactive_menu() {
         SETUP_DOTFILES_MANAGEMENT=$state
         ;;
       50) # Seção Hardware (13) - se aplicável
-        if [[ "$hw_model" == *"XPS"* ]]; then
+        if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
           echo "Alternando seção Hardware..."
           SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true)
           SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true)
@@ -439,15 +447,9 @@ interactive_menu() {
       *[0-9]*) # Números individuais ou múltiplos
         # Dividir entrada por espaços e processar cada número
         for num in $choice; do
-          if [[ "$num" =~ ^[1-9]$|^1[0-9]$|^2[0-7]$ ]]; then
-            case "$num" in
-              26) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-              27) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
-              *) 
-                local index=$((num - 1))
-                toggle_option "$index"
-                ;;
-            esac
+          if [[ "$num" =~ ^[0-9]+$ ]]; then
+            local index=$((num - 1))
+            toggle_option "$index"
           fi
         done
         ;;
@@ -463,6 +465,7 @@ interactive_menu() {
         INSTALL_ESPANSO=$state
         INSTALL_NANO=$state
         INSTALL_MICRO=$state
+        INSTALL_KATE=$state
         INSTALL_SLACK=$state
         INSTALL_TEAMS=$state
         INSTALL_JB_TOOLBOX=$state
@@ -494,6 +497,7 @@ interactive_menu() {
         INSTALL_ESPANSO=true
         INSTALL_NANO=true
         INSTALL_MICRO=true
+        INSTALL_KATE=true
         INSTALL_SLACK=true
         INSTALL_TEAMS=true
         INSTALL_JB_TOOLBOX=false
@@ -524,6 +528,7 @@ interactive_menu() {
         INSTALL_ESPANSO=true
         INSTALL_NANO=true
         INSTALL_MICRO=true
+        INSTALL_KATE=true
         INSTALL_SLACK=true
         INSTALL_TEAMS=true
         INSTALL_JB_TOOLBOX=false
@@ -925,6 +930,11 @@ install_core_apps() {
   if [[ "$INSTALL_MICRO" == true ]]; then
     info "Instalando micro..."
     pac micro || warn "Falha instalando micro"
+  fi
+  
+  if [[ "$INSTALL_KATE" == true ]]; then
+    info "Instalando Kate..."
+    pac kate || warn "Falha instalando Kate"
   fi
   
   if [[ "$INSTALL_SLACK" == true ]]; then
@@ -1975,6 +1985,7 @@ main() {
   [[ "$INSTALL_ESPANSO" == true ]] && echo "  • Espanso (text expander)"
   [[ "$INSTALL_NANO" == true ]] && echo "  • Nano (editor de texto)"
   [[ "$INSTALL_MICRO" == true ]] && echo "  • Micro (editor de texto moderno)"
+  [[ "$INSTALL_KATE" == true ]] && echo "  • Kate (editor de texto avançado)"
   [[ "$INSTALL_SLACK" == true ]] && echo "  • Slack (comunicação empresarial)"
   [[ "$INSTALL_TEAMS" == true ]] && echo "  • Microsoft Teams (comunicação empresarial)"
   [[ "$INSTALL_JB_TOOLBOX" == true ]] && echo "  • JetBrains Toolbox"
