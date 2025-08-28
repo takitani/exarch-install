@@ -85,6 +85,13 @@ O script apresenta um menu interativo moderno com navegação por teclado:
 - Cria backups datados antes de sobrescrever configurações existentes
 - Usa `rsync` para sincronização eficiente (com fallback para `cp`)
 
+#### 🔐 Gerenciamento de Dotfiles
+- **Chezmoi** - Gerenciador de dotfiles com suporte a templates e criptografia
+- **Age** - Ferramenta de criptografia moderna para arquivos sensíveis
+- Configuração interativa de repositório de dotfiles
+- Geração automática de chaves Age para criptografia
+- Suporte a múltiplas opções de configuração (repositório existente, novo repositório, sem criptografia)
+
 #### 💻 Suporte para Dell XPS 13 Plus (9320)
 
 O script detecta automaticamente o Dell XPS 13 Plus e oferece configurações específicas:
@@ -210,6 +217,59 @@ Se você possui um Dell XPS 13 Plus, o script:
 - O menu interativo facilita a personalização da instalação
 - A detecção de hardware é automática e não-intrusiva
 
+### Gerenciamento de Dotfiles com Chezmoi e Age
+
+O script oferece configuração completa para gerenciamento de dotfiles usando **Chezmoi** e **Age**:
+
+#### Chezmoi
+- **O que é**: Gerenciador de dotfiles com suporte a templates, criptografia e múltiplas máquinas
+- **Vantagens**: 
+  - Templates condicionais baseados em sistema/usuário
+  - Suporte nativo a criptografia com Age
+  - Sincronização bidirecional
+  - Suporte a múltiplos repositórios
+
+#### Age
+- **O que é**: Ferramenta de criptografia moderna, simples e segura
+- **Vantagens**:
+  - Criptografia baseada em chaves públicas/privadas
+  - Formato compacto e eficiente
+  - Integração nativa com Chezmoi
+  - Mais simples que GPG
+
+#### Configuração Automática
+O script oferece 4 opções de configuração:
+1. **Repositório existente**: Conecta a um repositório Git já existente
+2. **Novo repositório**: Cria um novo repositório local com estrutura básica
+3. **Sem criptografia**: Configura apenas Chezmoi (sem Age)
+4. **Manual**: Instala as ferramentas mas deixa a configuração para depois
+
+#### Comandos Úteis
+```bash
+# Aplicar dotfiles
+chezmoi apply
+
+# Ver diferenças
+chezmoi diff
+
+# Editar arquivo específico
+chezmoi edit ~/.bashrc
+
+# Adicionar novo arquivo
+chezmoi add ~/.config/nvim/init.vim
+
+# Criptografar arquivo com Age
+age -e -r "age1..." arquivo.txt > arquivo.txt.age
+
+# Descriptografar arquivo
+age -d -i ~/.config/age/keys.txt arquivo.txt.age > arquivo.txt
+```
+
+#### Documentação
+- **Chezmoi**: https://www.chezmoi.io/
+- **Age**: https://age-encryption.org/
+- **Exemplos**: https://github.com/twpayne/chezmoi/tree/master/docs/examples
+
 ### Troubleshooting
 
 **Problema com yay:**
@@ -228,3 +288,9 @@ Se você possui um Dell XPS 13 Plus, o script:
 **Mise não encontrado:**
 - Instale mise manualmente: `curl -fsSL https://mise.jdx.dev/install.sh | sh`
 - Adicione ao PATH conforme instruções da instalação
+
+**Chezmoi/Age não funcionam:**
+- Verifique se os pacotes foram instalados: `pacman -Q chezmoi age`
+- Para Chezmoi: `chezmoi --version`
+- Para Age: `age --version`
+- Se não estiverem no PATH, reinicie o terminal ou adicione ao PATH manualmente
