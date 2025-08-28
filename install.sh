@@ -883,13 +883,11 @@ configure_chromium_webcam() {
   # Configurar Chromium (padrão no Omarchy) para suporte à webcam no Wayland
   info "Configurando Chromium para webcam no Wayland..."
   
-  # Criar diretórios de configuração se não existirem
+  # Criar diretório de configuração se não existir
   local config_dir="$HOME/.config"
   local chromium_flags_file="$HOME/.config/chromium-flags.conf"
-  local applications_dir="$HOME/.local/share/applications"
   
   mkdir -p "$config_dir"
-  mkdir -p "$applications_dir"
   
   # 1. Criar arquivo de flags para Chromium
   if [[ ! -f "$chromium_flags_file" ]]; then
@@ -908,33 +906,11 @@ EOF
     fi
   fi
   
-  # 2. Criar .desktop personalizado para Chromium com suporte à webcam
-  local chromium_desktop_file="$applications_dir/chromium-webcam.desktop"
-  
-  cat > "$chromium_desktop_file" << 'EOF'
-[Desktop Entry]
-Version=1.0
-Name=Chromium (Webcam)
-GenericName=Web Browser with Webcam Support
-Comment=Access the Internet with webcam support
-Exec=chromium %U --enable-features=WebRTCPipeWireCapturer --ozone-platform=wayland
-Terminal=false
-X-MultipleArgs=false
-Type=Application
-Icon=chromium
-Categories=Network;WebBrowser;
-MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
-StartupWMClass=chromium-browser
-StartupNotify=true
-EOF
-  
-  log "Atalho Chromium com webcam criado: $chromium_desktop_file"
-  
-  # 3. Criar alias para terminal
+  # 2. Criar alias para terminal (opcional, para conveniência)
   local bashrc_file="$HOME/.bashrc"
   local zshrc_file="$HOME/.zshrc"
   
-  local chromium_alias="alias chromium-webcam='chromium --enable-features=WebRTCPipeWireCapturer --ozone-platform=wayland'"
+  local chromium_alias="alias chromium-webcam='chromium'"
   
   # Adicionar alias ao .bashrc se existir e não tiver o alias
   if [[ -f "$bashrc_file" ]] && ! grep -q "chromium-webcam" "$bashrc_file"; then
@@ -1895,9 +1871,8 @@ print_summary() {
   echo
   echo -e "${GREEN}📌 Nota sobre Chromium (padrão no Omarchy):${NC}"
   echo "   - Configurado automaticamente para suporte à webcam no Wayland"
-  echo "   - Atalho criado: 'Chromium (Webcam)' no menu de aplicações"
-  echo "   - Alias no terminal: 'chromium-webcam'"
   echo "   - Arquivo de flags: ~/.config/chromium-flags.conf"
+  echo "   - Alias opcional no terminal: 'chromium-webcam'"
   echo "   - A webcam agora funcionará em sites como Google Meet, Zoom, etc."
 }
 
