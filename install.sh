@@ -862,46 +862,184 @@ aur() {
 setup_dell_xps_9320_webcam() {
   info "Configurando webcam para Dell XPS 13 Plus (9320)"
   
-  # Instalar dependências essenciais primeiro
-  info "Instalando libcamera e pipewire-libcamera (obrigatórios para webcam)..."
+  # ===== NOVO MÉTODO MANUAL DE INSTALAÇÃO =====
+  # Passo 1: Instalar libcamera
+  info "Instalando libcamera..."
   pac libcamera || warn "Falha ao instalar libcamera"
+  
+  # Passo 2: Instalar pipewire-libcamera  
+  info "Instalando pipewire-libcamera..."
   pac pipewire-libcamera || warn "Falha ao instalar pipewire-libcamera"
   
-  # Instalar ivsc-driver do AUR
-  info "Instalando driver IVSC para webcam..."
-  if aur ivsc-driver; then
-    log "Driver IVSC instalado"
+  # Passo 3: Criar e instalar PKGBUILD para ivsc-firmware
+  info "Criando e instalando PKGBUILD para ivsc-firmware..."
+  local tmpdir_ivsc=$(mktemp -d)
+  cd "$tmpdir_ivsc" || return 1
+  
+  # Criar PKGBUILD para ivsc-firmware
+  cat > PKGBUILD << 'EOF'
+# Maintainer: você <you@example.com>
+
+pkgname=ivsc-firmware-git
+pkgver=r13.0000000
+pkgrel=1
+pkgdesc="Intel Visual Sensing Controller (IVSC) firmware binaries (from intel/ivsc-firmware)"
+arch=('any')
+url="https://github.com/intel/ivsc-firmware"
+license=('custom')
+depends=()
+makedepends=('git')
+provides=('intel-ivsc-firmware')
+conflicts=('intel-ivsc-firmware')
+source=("git+https://github.com/intel/ivsc-firmware.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$srcdir/ivsc-firmware"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+package() {
+    cd "$srcdir/ivsc-firmware"
+    # Instala os firmwares sob /usr/lib/firmware/vsc (em Arch /lib -> /usr/lib)
+    install -d "$pkgdir/usr/lib/firmware/vsc"
+    # preserva estrutura (soc_a1, soc_a1_prod, etc.)
+    cp -r --no-preserve=ownership firmware/* "$pkgdir/usr/lib/firmware/vsc/"
+    # Licença e README
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
+EOF
+  
+  info "Compilando e instalando ivsc-firmware..."
+  if makepkg -si --noconfirm; then
+    log "ivsc-firmware instalado com sucesso"
   else
-    warn "Falha ao instalar ivsc-driver. Tentando método alternativo..."
-    
-    # Método alternativo: compilar do fonte
-    local tmpdir=$(mktemp -d)
-    cd "$tmpdir" || return 1
-    
-    info "Clonando repositório ivsc-driver..."
-    if git clone https://github.com/intel/ivsc-driver.git; then
-      cd ivsc-driver || return 1
-      info "Compilando driver..."
-      if make && sudo make install; then
-        log "Driver IVSC compilado e instalado"
-        sudo modprobe intel_vsc
-        sudo modprobe mei_csi
-        sudo modprobe mei_ace
-      else
-        warn "Falha ao compilar driver IVSC"
-      fi
-    else
-      warn "Falha ao clonar repositório do driver"
-    fi
-    
-    cd - >/dev/null || true
-    rm -rf "$tmpdir"
+    warn "Falha ao instalar ivsc-firmware"
   fi
   
-  # Instalar ipu6-camera-bins e ipu6-camera-hal do AUR
-  info "Instalando binários e HAL da câmera IPU6..."
-  aur ipu6-camera-bins || warn "Falha ao instalar ipu6-camera-bins"
-  aur ipu6-camera-hal || warn "Falha ao instalar ipu6-camera-hal"
+  cd - >/dev/null || true
+  rm -rf "$tmpdir_ivsc"
+  
+  # Passo 4: Criar e instalar PKGBUILD para ipu6-camera-bins
+  info "Criando e instalando PKGBUILD para ipu6-camera-bins..."
+  local tmpdir_ipu6=$(mktemp -d)
+  cd "$tmpdir_ipu6" || return 1
+  
+  # Criar PKGBUILD para ipu6-camera-bins
+  cat > PKGBUILD << 'EOF'
+# Maintainer: você <you@example.com>
+pkgname=ipu6-camera-bins-git
+pkgver=r0.0000000
+pkgrel=1
+pkgdesc="Intel IPU6 camera firmware + userland binaries (proprietary) from intel/ipu6-camera-bins"
+arch=('x86_64' 'aarch64')
+url="https://github.com/intel/ipu6-camera-bins"
+license=('custom')
+provides=('intel-ipu6-camera-bins' 'ipu6-camera-bins')
+conflicts=('intel-ipu6-camera-bins' 'ipu6-camera-bins')
+depends=()          # libs são self-contained
+makedepends=('git')
+source=("$pkgname::git+https://github.com/intel/ipu6-camera-bins.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  # === Firmware ===
+  # README: copiar *.bin para /lib/firmware/intel/ipu (em Arch -> /usr/lib/firmware/intel/ipu)
+  # https://github.com/intel/ipu6-camera-bins (Deployment)
+  install -d "$pkgdir/usr/lib/firmware/intel/ipu"
+  cp -av "lib/firmware/intel/ipu/." "$pkgdir/usr/lib/firmware/intel/ipu/"
+
+  # === Bibliotecas runtime ===
+  # README: copiar lib* para /usr/lib e manter symlinks (cp -P) + gerar links sem sufixo
+  install -d "$pkgdir/usr/lib"
+  # preservar symlinks
+  cp -av -P lib/lib* "$pkgdir/usr/lib/"
+
+  # garantir que existam symlinks sem sufixo *.so (se não vierem prontos)
+  pushd "$pkgdir/usr/lib" >/dev/null
+  for lib in lib*.so.*; do
+    base="${lib%.*}"                # libfoo.so.X -> libfoo.so
+    [[ -e "${base}" ]] || ln -s "$lib" "${base}"
+  done
+  popd >/dev/null
+
+  # === Headers e pkgconfig (dev files) ===
+  install -d "$pkgdir/usr/include" "$pkgdir/usr/lib/pkgconfig"
+  if [[ -d include ]]; then
+    cp -av include/. "$pkgdir/usr/include/"
+  fi
+  if [[ -d lib/pkgconfig ]]; then
+    cp -av lib/pkgconfig/. "$pkgdir/usr/lib/pkgconfig/"
+  fi
+
+  # === Licença / docs ===
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  [[ -f README.md ]] && install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
+EOF
+  
+  info "Compilando e instalando ipu6-camera-bins..."
+  if makepkg -si --noconfirm; then
+    log "ipu6-camera-bins instalado com sucesso"
+  else
+    warn "Falha ao instalar ipu6-camera-bins"
+  fi
+  
+  cd - >/dev/null || true
+  rm -rf "$tmpdir_ipu6"
+  
+  # ===== FIM DO NOVO MÉTODO MANUAL =====
+  
+  # ===== CÓDIGO ANTIGO COMENTADO (mantido para referência) =====
+  # # Instalar dependências essenciais primeiro
+  # info "Instalando libcamera e pipewire-libcamera (obrigatórios para webcam)..."
+  # pac libcamera || warn "Falha ao instalar libcamera"
+  # pac pipewire-libcamera || warn "Falha ao instalar pipewire-libcamera"
+  # 
+  # # Instalar ivsc-driver do AUR
+  # info "Instalando driver IVSC para webcam..."
+  # if aur ivsc-driver; then
+  #   log "Driver IVSC instalado"
+  # else
+  #   warn "Falha ao instalar ivsc-driver. Tentando método alternativo..."
+  #   
+  #   # Método alternativo: compilar do fonte
+  #   local tmpdir=$(mktemp -d)
+  #   cd "$tmpdir" || return 1
+  #   
+  #   info "Clonando repositório ivsc-driver..."
+  #   if git clone https://github.com/intel/ivsc-driver.git; then
+  #     cd ivsc-driver || return 1
+  #     info "Compilando driver..."
+  #     if make && sudo make install; then
+  #       log "Driver IVSC compilado e instalado"
+  #       sudo modprobe intel_vsc
+  #       sudo modprobe mei_csi
+  #       sudo modprobe mei_ace
+  #     else
+  #       warn "Falha ao compilar driver IVSC"
+  #     fi
+  #   else
+  #     warn "Falha ao clonar repositório do driver"
+  #   fi
+  #   
+  #   cd - >/dev/null || true
+  #   rm -rf "$tmpdir"
+  # fi
+  # 
+  # # Instalar ipu6-camera-bins e ipu6-camera-hal do AUR
+  # info "Instalando binários e HAL da câmera IPU6..."
+  # aur ipu6-camera-bins || warn "Falha ao instalar ipu6-camera-bins"
+  # aur ipu6-camera-hal || warn "Falha ao instalar ipu6-camera-hal"
+  # ===== FIM DO CÓDIGO ANTIGO COMENTADO =====
   
   # Configurar firmware se necessário
   info "Verificando firmware da câmera..."
@@ -1053,9 +1191,23 @@ setup_dell_xps_9320_optimizations() {
   sudo systemctl enable --now thermald.service || warn "Falha ao habilitar thermald"
   
   # Configurar TLP se disponível
-  if pac tlp tlp-rdw; then
-    sudo systemctl enable --now tlp.service
-    log "TLP configurado para gerenciamento de energia"
+  info "Instalando TLP para gerenciamento de energia..."
+  local tlp_installed=false
+  
+  # Instalar TLP
+  if pac tlp; then
+    # Instalar TLP-RDW (Radio Device Wizard)
+    if pac tlp-rdw; then
+      tlp_installed=true
+      sudo systemctl enable --now tlp.service
+      log "TLP e TLP-RDW configurados para gerenciamento de energia"
+    else
+      # TLP instalado mas TLP-RDW falhou (não crítico)
+      tlp_installed=true
+      sudo systemctl enable --now tlp.service
+      log "TLP configurado (sem RDW)"
+      warn "TLP-RDW não pôde ser instalado (não crítico)"
+    fi
   else
     warn "Falha ao instalar TLP"
   fi
