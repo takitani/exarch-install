@@ -103,6 +103,11 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
 LOG_SUMMARY="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S)_summary.txt"
 
+# Sistema de jobs paralelos
+declare -A BACKGROUND_JOBS
+declare -A JOB_NAMES
+JOB_COUNTER=0
+
 # Função para escrever no arquivo de log
 write_log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
@@ -141,6 +146,123 @@ err() {
   printf "${RED}[ERR ]${NC} %s\n" "$*" >&2
   write_log "[ERROR] $*"
   write_summary "❌ ERRO: $*"
+}
+
+# Função para iniciar job em background
+start_background_job() {
+  local job_name="$1"
+  local pkg_name="$2"
+  local install_type="$3"  # "pac" ou "aur"
+  
+  ((JOB_COUNTER++))
+  local job_id="job_${JOB_COUNTER}"
+  local job_log="$LOG_DIR/${job_id}_${pkg_name}.log"
+  
+  info "🔄 Iniciando instalação em background: $job_name"
+  write_log "Iniciando job em background: $job_name ($install_type $pkg_name)"
+  
+  if [[ "$install_type" == "aur" ]]; then
+    (
+      echo "=== LOG DE INSTALAÇÃO: $job_name ===" > "$job_log"
+      echo "Comando: yay -S --noconfirm --needed --sudoloop $pkg_name" >> "$job_log"
+      echo "Início: $(date)" >> "$job_log"
+      echo "" >> "$job_log"
+      
+      if yay -S --noconfirm --needed --sudoloop "$pkg_name" >> "$job_log" 2>&1; then
+        echo "SUCCESS:$job_name:$pkg_name:aur" > "$LOG_DIR/${job_id}.result"
+      else
+        echo "FAILED:$job_name:$pkg_name:aur" > "$LOG_DIR/${job_id}.result"
+      fi
+      
+      echo "" >> "$job_log"
+      echo "Fim: $(date)" >> "$job_log"
+    ) &
+  elif [[ "$install_type" == "pac" ]]; then
+    (
+      echo "=== LOG DE INSTALAÇÃO: $job_name ===" > "$job_log"
+      echo "Comando: pacman -S --noconfirm --needed $pkg_name" >> "$job_log"
+      echo "Início: $(date)" >> "$job_log"
+      echo "" >> "$job_log"
+      
+      if sudo pacman -S --noconfirm --needed "$pkg_name" >> "$job_log" 2>&1; then
+        echo "SUCCESS:$job_name:$pkg_name:pac" > "$LOG_DIR/${job_id}.result"
+      else
+        echo "FAILED:$job_name:$pkg_name:pac" > "$LOG_DIR/${job_id}.result"
+      fi
+      
+      echo "" >> "$job_log"
+      echo "Fim: $(date)" >> "$job_log"
+    ) &
+  fi
+  
+  local pid=$!
+  BACKGROUND_JOBS["$job_id"]=$pid
+  JOB_NAMES["$job_id"]="$job_name"
+  
+  write_log "Job $job_id ($job_name) iniciado com PID $pid"
+}
+
+# Função para aguardar jobs em background
+wait_for_background_jobs() {
+  if [[ ${#BACKGROUND_JOBS[@]} -eq 0 ]]; then
+    return 0
+  fi
+  
+  info "⏳ Aguardando conclusão de ${#BACKGROUND_JOBS[@]} instalações em background..."
+  
+  local completed=0
+  local total=${#BACKGROUND_JOBS[@]}
+  
+  # Mostrar progresso
+  while [[ $completed -lt $total ]]; do
+    for job_id in "${!BACKGROUND_JOBS[@]}"; do
+      local pid=${BACKGROUND_JOBS[$job_id]}
+      local job_name=${JOB_NAMES[$job_id]}
+      
+      # Verificar se o job terminou
+      if ! kill -0 "$pid" 2>/dev/null; then
+        ((completed++))
+        unset BACKGROUND_JOBS["$job_id"]
+        
+        # Verificar resultado
+        local result_file="$LOG_DIR/${job_id}.result"
+        if [[ -f "$result_file" ]]; then
+          local result
+          result=$(cat "$result_file")
+          IFS=':' read -r status name pkg type <<< "$result"
+          
+          if [[ "$status" == "SUCCESS" ]]; then
+            log "✅ $name concluído com sucesso"
+            INSTALLED_PACKAGES+=("$pkg ($type) [background]")
+            write_summary "✅ Instalado (background): $pkg ($type)"
+          else
+            warn "❌ $name falhou"
+            FAILED_PACKAGES+=("$pkg ($type) [background]")
+            write_summary "❌ Falhou (background): $pkg ($type)"
+          fi
+          
+          # Anexar log do job ao log principal
+          local job_log="$LOG_DIR/${job_id}_${pkg}.log"
+          if [[ -f "$job_log" ]]; then
+            echo "" >> "$LOG_FILE"
+            echo "=== LOG DO JOB: $name ===" >> "$LOG_FILE"
+            cat "$job_log" >> "$LOG_FILE"
+            echo "=== FIM DO LOG DO JOB ===" >> "$LOG_FILE"
+            rm -f "$job_log"
+          fi
+          
+          rm -f "$result_file"
+        fi
+        
+        info "📊 Progresso: $completed/$total jobs concluídos"
+      fi
+    done
+    
+    # Pequena pausa para não consumir muito CPU
+    [[ $completed -lt $total ]] && sleep 2
+  done
+  
+  log "🎉 Todas as instalações em background foram concluídas!"
 }
 
 # Detecção de hardware
@@ -986,6 +1108,97 @@ install_core_apps() {
   info "Configurando Chromium para suporte à webcam no Wayland..."
   configure_chromium_webcam
   
+  # =============================================
+  # GRUPO 1: Aplicações pesadas (AUR) - EM PARALELO
+  # =============================================
+  info "🚀 Iniciando instalações pesadas em paralelo..."
+  
+  # JetBrains Toolbox (AUR - build pesado)
+  if [[ "$INSTALL_JB_TOOLBOX" == true ]]; then
+    # Verificar se já está instalado primeiro
+    if ! yay -Q jetbrains-toolbox &>/dev/null 2>&1; then
+      start_background_job "JetBrains Toolbox" "jetbrains-toolbox" "aur"
+    else
+      SKIPPED_PACKAGES+=("jetbrains-toolbox (AUR)")
+      write_summary "⏩ Já instalado: jetbrains-toolbox (AUR)"
+    fi
+  fi
+  
+  # Slack (AUR - build pesado)
+  if [[ "$INSTALL_SLACK" == true ]]; then
+    if ! yay -Q slack-desktop &>/dev/null 2>&1; then
+      start_background_job "Slack" "slack-desktop" "aur"
+    else
+      SKIPPED_PACKAGES+=("slack-desktop (AUR)")
+      write_summary "⏩ Já instalado: slack-desktop (AUR)"
+    fi
+  fi
+  
+  # Teams (AUR - build pesado)
+  if [[ "$INSTALL_TEAMS" == true ]]; then
+    if ! yay -Q teams-for-linux &>/dev/null 2>&1; then
+      start_background_job "Microsoft Teams" "teams-for-linux" "aur"
+    else
+      SKIPPED_PACKAGES+=("teams-for-linux (AUR)")
+      write_summary "⏩ Já instalado: teams-for-linux (AUR)"
+    fi
+  fi
+  
+  # Cursor IDE (AUR - build pesado)
+  if [[ "$INSTALL_CURSOR" == true ]]; then
+    if ! yay -Q cursor-bin &>/dev/null 2>&1; then
+      start_background_job "Cursor IDE" "cursor-bin" "aur"
+    else
+      SKIPPED_PACKAGES+=("cursor-bin (AUR)")
+      write_summary "⏩ Já instalado: cursor-bin (AUR)"
+    fi
+  fi
+  
+  # VS Code (AUR)
+  if [[ "$INSTALL_VSCODE" == true ]]; then
+    if ! yay -Q visual-studio-code-bin &>/dev/null 2>&1; then
+      start_background_job "Visual Studio Code" "visual-studio-code-bin" "aur"
+    else
+      SKIPPED_PACKAGES+=("visual-studio-code-bin (AUR)")
+      write_summary "⏩ Já instalado: visual-studio-code-bin (AUR)"
+    fi
+  fi
+  
+  # Windsurf IDE (AUR)
+  if [[ "$INSTALL_WINDSURF" == true ]]; then
+    if ! yay -Q windsurf-bin &>/dev/null 2>&1; then
+      start_background_job "Windsurf IDE" "windsurf-bin" "aur"
+    else
+      SKIPPED_PACKAGES+=("windsurf-bin (AUR)")
+      write_summary "⏩ Já instalado: windsurf-bin (AUR)"
+    fi
+  fi
+  
+  # Google Chrome (AUR)
+  if [[ "$INSTALL_GOOGLE_CHROME" == true ]]; then
+    if ! yay -Q google-chrome &>/dev/null 2>&1; then
+      start_background_job "Google Chrome" "google-chrome" "aur"
+    else
+      SKIPPED_PACKAGES+=("google-chrome (AUR)")
+      write_summary "⏩ Já instalado: google-chrome (AUR)"
+    fi
+  fi
+  
+  # Dropbox (AUR)
+  if [[ "$INSTALL_DROPBOX" == true ]]; then
+    if ! yay -Q dropbox &>/dev/null 2>&1; then
+      start_background_job "Dropbox" "dropbox" "aur"
+    else
+      SKIPPED_PACKAGES+=("dropbox (AUR)")
+      write_summary "⏩ Já instalado: dropbox (AUR)"
+    fi
+  fi
+  
+  # =============================================
+  # GRUPO 2: Aplicações rápidas (pacman) - SEQUENCIAL
+  # =============================================
+  info "⚡ Instalando aplicações rápidas..."
+  
   # Editores de texto opcionais
   if [[ "$INSTALL_NANO" == true ]]; then
     info "Instalando nano..."
@@ -1002,20 +1215,7 @@ install_core_apps() {
     pac kate || warn "Falha instalando Kate"
   fi
   
-  if [[ "$INSTALL_SLACK" == true ]]; then
-    info "Instalando Slack..."
-    aur slack-desktop || warn "Falha instalando Slack (AUR)"
-  fi
-
-  if [[ "$INSTALL_TEAMS" == true ]]; then
-    info "Instalando Microsoft Teams..."
-    aur teams-for-linux || warn "Falha instalando Teams (AUR)"
-  fi
-  
-  if [[ "$INSTALL_GOOGLE_CHROME" == true ]]; then
-    info "Instalando Google Chrome..."
-    aur google-chrome || warn "Falha no Google Chrome (AUR)"
-  fi
+  # Slack, Teams, Chrome já estão sendo instalados em paralelo acima
   
   if [[ "$INSTALL_FIREFOX" == true ]]; then
     info "Instalando Firefox..."
@@ -1317,20 +1517,15 @@ EOF
     fi
   fi
   
-  if [[ "$INSTALL_CURSOR" == true ]]; then
-    info "Instalando Cursor IDE..."
-    aur cursor-bin || warn "Falha no Cursor (AUR)"
-  fi
+  # Cursor, VS Code e Windsurf já sendo instalados em paralelo acima
   
-  if [[ "$INSTALL_VSCODE" == true ]]; then
-    info "Instalando Visual Studio Code..."
-    aur visual-studio-code-bin || warn "Falha no VSCode (AUR)"
-  fi
+  # =============================================
+  # AGUARDAR JOBS EM BACKGROUND
+  # =============================================
+  # Aguardar todas as instalações pesadas terminarem
+  wait_for_background_jobs
   
-  if [[ "$INSTALL_WINDSURF" == true ]]; then
-    info "Instalando Windsurf IDE..."
-    aur windsurf-bin || warn "Falha no Windsurf (AUR)"
-  fi
+  info "✨ Todas as instalações foram concluídas!"
 }
 
 activate_mise_in_shell() {
