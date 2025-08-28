@@ -97,10 +97,51 @@ NC='\033[0m' # No Color
 # Índice selecionado no menu
 SELECTED_INDEX=0
 
-log() { printf "${GREEN}[ OK ]${NC} %s\n" "$*"; }
-info() { printf "${BLUE}[ .. ]${NC} %s\n" "$*"; }
-warn() { printf "${YELLOW}[ !! ]${NC} %s\n" "$*"; }
-err() { printf "${RED}[ERR ]${NC} %s\n" "$*" >&2; }
+# Configurações de log
+LOG_DIR="$HOME/.local/share/exarch-install"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
+LOG_SUMMARY="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S)_summary.txt"
+
+# Função para escrever no arquivo de log
+write_log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+}
+
+# Função para escrever no sumário
+write_summary() {
+  echo "$*" >> "$LOG_SUMMARY"
+}
+
+# Inicializar arquivos de log
+echo "==========================================================" > "$LOG_FILE"
+echo "EXARCH INSTALL LOG - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_FILE"
+echo "==========================================================" >> "$LOG_FILE"
+echo "" >> "$LOG_FILE"
+
+echo "==========================================================" > "$LOG_SUMMARY"
+echo "EXARCH INSTALL SUMMARY - $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG_SUMMARY"
+echo "==========================================================" >> "$LOG_SUMMARY"
+echo "" >> "$LOG_SUMMARY"
+
+log() { 
+  printf "${GREEN}[ OK ]${NC} %s\n" "$*"
+  write_log "[OK] $*"
+}
+info() { 
+  printf "${BLUE}[ .. ]${NC} %s\n" "$*"
+  write_log "[INFO] $*"
+}
+warn() { 
+  printf "${YELLOW}[ !! ]${NC} %s\n" "$*" >&2
+  write_log "[WARN] $*"
+  write_summary "⚠️  AVISO: $*"
+}
+err() { 
+  printf "${RED}[ERR ]${NC} %s\n" "$*" >&2
+  write_log "[ERROR] $*"
+  write_summary "❌ ERRO: $*"
+}
 
 # Detecção de hardware
 detect_hardware() {
@@ -646,13 +687,24 @@ pac() {
   if [[ "$DEBUG_MODE" == true ]]; then
     info "[DEBUG] Instalação simulada: pacman -S $@"
     INSTALLED_PACKAGES+=("$pkg (pacman) [DEBUG]")
+    write_summary "🔄 DEBUG: $pkg (pacman)"
     return 0
   fi
   
-  if sudo pacman -S --noconfirm --needed "$@"; then
+  # Verificar se já está instalado
+  if pacman -Q "$pkg" &>/dev/null; then
+    SKIPPED_PACKAGES+=("$pkg (pacman)")
+    write_summary "⏩ Já instalado: $pkg (pacman)"
+    return 0
+  fi
+  
+  write_log "Tentando instalar $pkg via pacman..."
+  if sudo pacman -S --noconfirm --needed "$@" 2>>"$LOG_FILE" 1>&2; then
     INSTALLED_PACKAGES+=("$pkg (pacman)")
+    write_summary "✅ Instalado: $pkg (pacman)"
   else
     FAILED_PACKAGES+=("$pkg (pacman)")
+    write_summary "❌ Falhou: $pkg (pacman)"
     return 1
   fi
 }
@@ -663,13 +715,24 @@ aur() {
   if [[ "$DEBUG_MODE" == true ]]; then
     info "[DEBUG] Instalação simulada: yay -S $@"
     INSTALLED_PACKAGES+=("$pkg (AUR) [DEBUG]")
+    write_summary "🔄 DEBUG: $pkg (AUR)"
     return 0
   fi
   
-  if yay -S --noconfirm --needed --sudoloop "$@" 2>&1 | grep -v "cannot use yay as root"; then
+  # Verificar se já está instalado
+  if yay -Q "$pkg" &>/dev/null 2>&1; then
+    SKIPPED_PACKAGES+=("$pkg (AUR)")
+    write_summary "⏩ Já instalado: $pkg (AUR)"
+    return 0
+  fi
+  
+  write_log "Tentando instalar $pkg via yay (AUR)..."
+  if yay -S --noconfirm --needed --sudoloop "$@" 2>&1 | tee -a "$LOG_FILE" | grep -v "cannot use yay as root"; then
     INSTALLED_PACKAGES+=("$pkg (AUR)")
+    write_summary "✅ Instalado: $pkg (AUR)"
   else
     FAILED_PACKAGES+=("$pkg (AUR)")
+    write_summary "❌ Falhou: $pkg (AUR)"
     return 1
   fi
 }
@@ -1750,6 +1813,16 @@ sync_hypr_configs() {
 }
 
 print_summary() {
+  # Escrever informações finais no sumário
+  write_summary ""
+  write_summary "=========================================="
+  write_summary "RESUMO FINAL"
+  write_summary "=========================================="
+  write_summary "Total instalados: ${#INSTALLED_PACKAGES[@]}"
+  write_summary "Total pulados (já instalados): ${#SKIPPED_PACKAGES[@]}"
+  write_summary "Total falhados: ${#FAILED_PACKAGES[@]}"
+  write_summary ""
+  
   echo
   echo "======================================"
   echo "         SUMÁRIO DA INSTALAÇÃO"
@@ -1950,6 +2023,22 @@ post_install_options() {
     echo
     log "Setup finalizado. Reinicie o sistema quando conveniente."
   fi
+  
+  # Exibir informações sobre os arquivos de log
+  echo
+  echo "======================================"
+  echo -e "${GREEN}📁 ARQUIVOS DE LOG GERADOS${NC}"
+  echo "======================================"
+  echo
+  echo -e "${CYAN}Log completo:${NC}"
+  echo "  $LOG_FILE"
+  echo
+  echo -e "${CYAN}Sumário de instalação:${NC}"
+  echo "  $LOG_SUMMARY"
+  echo
+  echo -e "${YELLOW}💡 Dica:${NC} Use 'cat $LOG_SUMMARY' para ver o resumo"
+  echo -e "${YELLOW}💡 Dica:${NC} Use 'less $LOG_FILE' para ver o log completo"
+  echo
 }
 
 main() {
@@ -2016,8 +2105,48 @@ main() {
   read -r confirm
   if [[ "$confirm" != "s" ]] && [[ "$confirm" != "S" ]]; then
     echo "Instalação cancelada."
+    write_summary "INSTALAÇÃO CANCELADA PELO USUÁRIO"
+    echo
+    echo "Log salvo em: $LOG_SUMMARY"
     exit 0
   fi
+  
+  # Registrar configurações selecionadas no log
+  write_summary "CONFIGURAÇÕES SELECIONADAS:"
+  write_summary "=========================================="
+  [[ "$INSTALL_GOOGLE_CHROME" == true ]] && write_summary "• Google Chrome"
+  [[ "$INSTALL_FIREFOX" == true ]] && write_summary "• Firefox"
+  [[ "$INSTALL_COPYQ" == true ]] && write_summary "• CopyQ"
+  [[ "$INSTALL_DROPBOX" == true ]] && write_summary "• Dropbox"
+  [[ "$INSTALL_AWS_VPN" == true ]] && write_summary "• AWS VPN Client"
+  [[ "$INSTALL_POSTMAN" == true ]] && write_summary "• Postman"
+  [[ "$INSTALL_REMMINA" == true ]] && write_summary "• Remmina"
+  [[ "$INSTALL_ESPANSO" == true ]] && write_summary "• Espanso"
+  [[ "$INSTALL_NANO" == true ]] && write_summary "• Nano"
+  [[ "$INSTALL_MICRO" == true ]] && write_summary "• Micro"
+  [[ "$INSTALL_KATE" == true ]] && write_summary "• Kate"
+  [[ "$INSTALL_SLACK" == true ]] && write_summary "• Slack"
+  [[ "$INSTALL_TEAMS" == true ]] && write_summary "• Teams"
+  [[ "$INSTALL_JB_TOOLBOX" == true ]] && write_summary "• JetBrains Toolbox"
+  [[ "$INSTALL_JB_RIDER" == true ]] && write_summary "• Rider"
+  [[ "$INSTALL_JB_DATAGRIP" == true ]] && write_summary "• DataGrip"
+  [[ "$INSTALL_CURSOR" == true ]] && write_summary "• Cursor"
+  [[ "$INSTALL_VSCODE" == true ]] && write_summary "• VS Code"
+  [[ "$INSTALL_WINDSURF" == true ]] && write_summary "• Windsurf"
+  [[ "$INSTALL_MISE_RUNTIMES" == true ]] && write_summary "• Mise Runtimes"
+  [[ "$INSTALL_CLAUDE_CODE" == true ]] && write_summary "• Claude Code CLI"
+  [[ "$INSTALL_CODEX_CLI" == true ]] && write_summary "• Codex CLI"
+  [[ "$INSTALL_GEMINI_CLI" == true ]] && write_summary "• Gemini CLI"
+  [[ "$INSTALL_CHEZMOI" == true ]] && write_summary "• Chezmoi"
+  [[ "$INSTALL_AGE" == true ]] && write_summary "• Age"
+  [[ "$SYNC_HYPR_CONFIGS" == true ]] && write_summary "• Sync Hypr Configs"
+  [[ "$SETUP_DOTFILES_MANAGEMENT" == true ]] && write_summary "• Setup Dotfiles Management"
+  [[ "$SETUP_DELL_XPS_9320" == true ]] && write_summary "• Dell XPS 9320 Config"
+  [[ "$SETUP_DUAL_KEYBOARD" == true ]] && write_summary "• Dual Keyboard Setup"
+  write_summary ""
+  write_summary "INÍCIO DA INSTALAÇÃO: $(date '+%Y-%m-%d %H:%M:%S')"
+  write_summary "=========================================="
+  write_summary ""
   
   require_sudo
   ensure_tools
