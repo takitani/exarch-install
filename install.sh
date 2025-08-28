@@ -379,11 +379,13 @@ interactive_menu() {
   hw_model=$(detect_hardware)
   
   # Auto-configurar para Dell XPS 13 Plus
-  if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]] || [[ "$FORCE_XPS" == true ]]; then
+  if [[ "$hw_model" == *"XPS 13 9320"* ]] || [[ "$hw_model" == *"XPS 13 Plus"* ]] || [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo -e "${YELLOW}🔍 Dell XPS 13 Plus detectado - Marcando configurações de hardware específicas...${NC}"
+    echo -e "${CYAN}Hardware detectado: '$hw_model'${NC}"
     SETUP_DELL_XPS_9320=true    # Auto-marcar configuração XPS
     SETUP_DUAL_KEYBOARD=true    # Auto-marcar teclados duplos
-    sleep 1
+    echo -e "${GREEN}✓ Configurações marcadas: XPS=$SETUP_DELL_XPS_9320, Teclados=$SETUP_DUAL_KEYBOARD${NC}"
+    sleep 2
   fi
   
   while true; do
