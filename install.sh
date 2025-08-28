@@ -906,29 +906,7 @@ EOF
     fi
   fi
   
-  # 2. Criar alias para terminal (opcional, para conveniência)
-  local bashrc_file="$HOME/.bashrc"
-  local zshrc_file="$HOME/.zshrc"
-  
-  local chromium_alias="alias chromium-webcam='chromium'"
-  
-  # Adicionar alias ao .bashrc se existir e não tiver o alias
-  if [[ -f "$bashrc_file" ]] && ! grep -q "chromium-webcam" "$bashrc_file"; then
-    echo "" >> "$bashrc_file"
-    echo "# Chromium com suporte à webcam (Wayland)" >> "$bashrc_file"
-    echo "$chromium_alias" >> "$bashrc_file"
-    log "Alias chromium-webcam adicionado ao .bashrc"
-  fi
-  
-  # Adicionar alias ao .zshrc se existir e não tiver o alias
-  if [[ -f "$zshrc_file" ]] && ! grep -q "chromium-webcam" "$zshrc_file"; then
-    echo "" >> "$zshrc_file"
-    echo "# Chromium com suporte à webcam (Wayland)" >> "$zshrc_file"
-    echo "$chromium_alias" >> "$zshrc_file"
-    log "Alias chromium-webcam adicionado ao .zshrc"
-  fi
-  
-  CONFIGURED_RUNTIMES+=("Chromium configurado para webcam (Wayland)")
+  CONFIGURED_RUNTIMES+=("Chromium configurado para webcam no Wayland")
 }
 
 install_core_apps() {
@@ -1869,11 +1847,10 @@ print_summary() {
   
   # Nota sobre Chromium (sempre configurado)
   echo
-  echo -e "${GREEN}📌 Nota sobre Chromium (padrão no Omarchy):${NC}"
-  echo "   - Configurado automaticamente para suporte à webcam no Wayland"
-  echo "   - Arquivo de flags: ~/.config/chromium-flags.conf"
-  echo "   - Alias opcional no terminal: 'chromium-webcam'"
-  echo "   - A webcam agora funcionará em sites como Google Meet, Zoom, etc."
+  echo -e "${GREEN}📌 Nota sobre Chromium:${NC}"
+  echo "   - Webcam configurada automaticamente via PipeWire"
+  echo "   - Flags aplicadas em: ~/.config/chromium-flags.conf"
+  echo "   - A webcam funcionará em Google Meet, Zoom, Discord, etc."
 }
 
 post_install_options() {
