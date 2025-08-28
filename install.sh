@@ -37,29 +37,35 @@ SKIPPED_PACKAGES=()
 CONFIGURED_RUNTIMES=()
 
 # Configurações de instalação (modificadas pelo menu)
-INSTALL_GOOGLE_CHROME=false
-INSTALL_FIREFOX=false
-INSTALL_COPYQ=false
-INSTALL_DROPBOX=false
-INSTALL_AWS_VPN=false
-INSTALL_POSTMAN=false
-INSTALL_REMMINA=false
-INSTALL_ESPANSO=false
-INSTALL_NANO=false
-INSTALL_MICRO=false
-INSTALL_SLACK=false
-INSTALL_JB_TOOLBOX=false
-INSTALL_JB_RIDER=false
-INSTALL_JB_DATAGRIP=false
-INSTALL_CURSOR=false
-INSTALL_VSCODE=false
-INSTALL_WINDSURF=false
-INSTALL_MISE_RUNTIMES=false
-INSTALL_CLAUDE_CODE=false
-INSTALL_CODEX_CLI=false
-INSTALL_GEMINI_CLI=false
-SYNC_HYPR_CONFIGS=false
+# Por padrão, tudo marcado exceto JetBrains Toolbox
+INSTALL_GOOGLE_CHROME=true
+INSTALL_FIREFOX=true
+INSTALL_COPYQ=true
+INSTALL_DROPBOX=true
+INSTALL_AWS_VPN=true
+INSTALL_POSTMAN=true
+INSTALL_REMMINA=true
+INSTALL_ESPANSO=true
+INSTALL_NANO=true
+INSTALL_MICRO=true
+INSTALL_SLACK=true
+INSTALL_TEAMS=true
+INSTALL_JB_TOOLBOX=false  # Por padrão, instalar IDEs separadamente
+INSTALL_JB_RIDER=true
+INSTALL_JB_DATAGRIP=true
+INSTALL_CURSOR=true
+INSTALL_VSCODE=true
+INSTALL_WINDSURF=true
+INSTALL_MISE_RUNTIMES=true
+INSTALL_CLAUDE_CODE=true
+INSTALL_CODEX_CLI=true
+INSTALL_GEMINI_CLI=true
+SYNC_HYPR_CONFIGS=true
 SETUP_DELL_XPS_9320=false
+SETUP_DUAL_KEYBOARD=false  # BR + US Internacional para Dell XPS
+INSTALL_CHEZMOI=true
+INSTALL_AGE=true
+SETUP_DOTFILES_MANAGEMENT=false
 
 DEFAULT_NODE="lts"         # Ex.: lts | 22 | 20
 DEFAULT_DOTNET_DEFAULT="9" # Default global
@@ -175,6 +181,7 @@ show_menu() {
   echo -e "  ${num}) [$([ "$INSTALL_NANO" == true ] && echo '✓' || echo ' ')] Nano - Editor de texto simples"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_MICRO" == true ] && echo '✓' || echo ' ')] Micro - Editor de texto moderno"; ((num++))
   echo -e "  ${num}) [$([ "$INSTALL_SLACK" == true ] && echo '✓' || echo ' ')] Slack - Comunicação empresarial"; ((num++))
+  echo -e "  ${num}) [$([ "$INSTALL_TEAMS" == true ] && echo '✓' || echo ' ')] Microsoft Teams - Comunicação empresarial"; ((num++))
   
   echo
   echo -e "${GREEN}🛠️ JetBrains IDEs ${EXATO_YELLOW}[20]${NC}:${NC}"
@@ -201,11 +208,15 @@ show_menu() {
   echo
   echo -e "${GREEN}⚙️ Configurações ${EXATO_YELLOW}[40]${NC}:${NC}"
   echo -e " ${num}) [$([ "$SYNC_HYPR_CONFIGS" == true ] && echo '✓' || echo ' ')] Sincronizar configurações Hypr/Hyprl"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_CHEZMOI" == true ] && echo '✓' || echo ' ')] Chezmoi - Gerenciador de dotfiles"; ((num++))
+  echo -e " ${num}) [$([ "$INSTALL_AGE" == true ] && echo '✓' || echo ' ')] Age - Criptografia de arquivos"; ((num++))
+  echo -e " ${num}) [$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo '✓' || echo ' ')] Configurar gerenciamento de dotfiles (Chezmoi + Age)"; ((num++))
   
   if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo
     echo -e "${GREEN}💻 Hardware Específico ${EXATO_YELLOW}[50]${NC}:${NC}"
-    echo -e " ${num}) [$([ "$SETUP_DELL_XPS_9320" == true ] && echo '✓' || echo ' ')] Configurar Dell XPS 13 Plus (webcam + otimizações)"
+    echo -e " ${num}) [$([ "$SETUP_DELL_XPS_9320" == true ] && echo '✓' || echo ' ')] Configurar Dell XPS 13 Plus (webcam + otimizações)"; ((num++))
+    echo -e " ${num}) [$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo '✓' || echo ' ')] Teclados duplos: BR (padrão) + US Internacional"
   fi
   
   echo
@@ -228,19 +239,23 @@ update_states_from_array() {
   INSTALL_NANO="${states[8]}"
   INSTALL_MICRO="${states[9]}"
   INSTALL_SLACK="${states[10]}"
-  INSTALL_JB_TOOLBOX="${states[11]}"
-  INSTALL_JB_RIDER="${states[12]}"
-  INSTALL_JB_DATAGRIP="${states[13]}"
-  INSTALL_CURSOR="${states[14]}"
-  INSTALL_VSCODE="${states[15]}"
-  INSTALL_WINDSURF="${states[16]}"
-  INSTALL_MISE_RUNTIMES="${states[17]}"
-  INSTALL_CLAUDE_CODE="${states[18]}"
-  INSTALL_CODEX_CLI="${states[19]}"
-  INSTALL_GEMINI_CLI="${states[20]}"
-  SYNC_HYPR_CONFIGS="${states[21]}"
-  if [[ ${#states[@]} -gt 22 ]]; then
-    SETUP_DELL_XPS_9320="${states[22]}"
+  INSTALL_TEAMS="${states[11]}"
+  INSTALL_JB_TOOLBOX="${states[12]}"
+  INSTALL_JB_RIDER="${states[13]}"
+  INSTALL_JB_DATAGRIP="${states[14]}"
+  INSTALL_CURSOR="${states[15]}"
+  INSTALL_VSCODE="${states[16]}"
+  INSTALL_WINDSURF="${states[17]}"
+  INSTALL_MISE_RUNTIMES="${states[18]}"
+  INSTALL_CLAUDE_CODE="${states[19]}"
+  INSTALL_CODEX_CLI="${states[20]}"
+  INSTALL_GEMINI_CLI="${states[21]}"
+  SYNC_HYPR_CONFIGS="${states[22]}"
+  INSTALL_CHEZMOI="${states[23]}"
+  INSTALL_AGE="${states[24]}"
+  SETUP_DOTFILES_MANAGEMENT="${states[25]}"
+  if [[ ${#states[@]} -gt 26 ]]; then
+    SETUP_DELL_XPS_9320="${states[26]}"
   fi
 }
 
@@ -257,24 +272,29 @@ toggle_option() {
     8) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
     9) INSTALL_MICRO=$([ "$INSTALL_MICRO" == true ] && echo false || echo true) ;;
     10) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
-    11) 
+    11) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    12) 
       INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true)
       ;;
-    12) 
+    13) 
       INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true)
       ;;
-    13) 
+    14) 
       INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true)
       ;;
-    14) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    15) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
-    16) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
-    17) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    18) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    19) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
-    20) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    21) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    22) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    15) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    16) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    17) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
+    18) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    19) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    20) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    21) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
+    22) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    23) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    24) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    25) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    26) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    27) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -292,12 +312,15 @@ toggle_option() {
       INSTALL_WINDSURF=$state
       INSTALL_MISE_RUNTIMES=$state
       INSTALL_CLAUDE_CODE=$state
-      INSTALL_CODEX_CLI=$state
-      INSTALL_GEMINI_CLI=$state
-      SYNC_HYPR_CONFIGS=$state
-      if [[ "$(detect_hardware)" == *"XPS"* ]]; then
-        SETUP_DELL_XPS_9320=$state
-      fi
+              INSTALL_CODEX_CLI=$state
+        INSTALL_GEMINI_CLI=$state
+        SYNC_HYPR_CONFIGS=$state
+        INSTALL_CHEZMOI=$state
+        INSTALL_AGE=$state
+        SETUP_DOTFILES_MANAGEMENT=$state
+        if [[ "$(detect_hardware)" == *"XPS"* ]]; then
+          SETUP_DELL_XPS_9320=$state
+        fi
       ;;
     r|R)
       INSTALL_GOOGLE_CHROME=true
@@ -335,6 +358,9 @@ toggle_option() {
       INSTALL_CODEX_CLI=true
       INSTALL_GEMINI_CLI=true
       SYNC_HYPR_CONFIGS=true
+      INSTALL_CHEZMOI=true
+      INSTALL_AGE=true
+      SETUP_DOTFILES_MANAGEMENT=true
       if [[ "$(detect_hardware)" == *"XPS"* ]]; then
         SETUP_DELL_XPS_9320=true
       fi
@@ -361,7 +387,7 @@ interactive_menu() {
     read -r choice
     
     case "$choice" in
-      10) # Seção Aplicações (1-11)
+      10) # Seção Aplicações (1-12)
         echo "Alternando seção Aplicações..."
         local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
         INSTALL_GOOGLE_CHROME=$state
@@ -375,6 +401,7 @@ interactive_menu() {
         INSTALL_NANO=$state
         INSTALL_MICRO=$state
         INSTALL_SLACK=$state
+        INSTALL_TEAMS=$state
         ;;
       20) # Seção JetBrains (6-8)
         echo "Alternando seção JetBrains..."
@@ -394,22 +421,33 @@ interactive_menu() {
         INSTALL_CODEX_CLI=$state
         INSTALL_GEMINI_CLI=$state
         ;;
-      40) # Seção Configurações (12)
+      40) # Seção Configurações (12-15)
         echo "Alternando seção Configurações..."
-        SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true)
+        local state=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true)
+        SYNC_HYPR_CONFIGS=$state
+        INSTALL_CHEZMOI=$state
+        INSTALL_AGE=$state
+        SETUP_DOTFILES_MANAGEMENT=$state
         ;;
       50) # Seção Hardware (13) - se aplicável
         if [[ "$hw_model" == *"XPS"* ]]; then
           echo "Alternando seção Hardware..."
           SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true)
+          SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true)
         fi
         ;;
       *[0-9]*) # Números individuais ou múltiplos
         # Dividir entrada por espaços e processar cada número
         for num in $choice; do
-          if [[ "$num" =~ ^[1-9]$|^1[0-5]$ ]]; then
-            local index=$((num - 1))
-            toggle_option "$index"
+          if [[ "$num" =~ ^[1-9]$|^1[0-9]$|^2[0-7]$ ]]; then
+            case "$num" in
+              26) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+              27) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+              *) 
+                local index=$((num - 1))
+                toggle_option "$index"
+                ;;
+            esac
           fi
         done
         ;;
@@ -426,6 +464,7 @@ interactive_menu() {
         INSTALL_NANO=$state
         INSTALL_MICRO=$state
         INSTALL_SLACK=$state
+        INSTALL_TEAMS=$state
         INSTALL_JB_TOOLBOX=$state
         INSTALL_JB_RIDER=$state
         INSTALL_JB_DATAGRIP=$state
@@ -437,6 +476,9 @@ interactive_menu() {
         INSTALL_CODEX_CLI=$state
         INSTALL_GEMINI_CLI=$state
         SYNC_HYPR_CONFIGS=$state
+        INSTALL_CHEZMOI=$state
+        INSTALL_AGE=$state
+        SETUP_DOTFILES_MANAGEMENT=$state
         if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
           SETUP_DELL_XPS_9320=$state
         fi
@@ -453,6 +495,7 @@ interactive_menu() {
         INSTALL_NANO=true
         INSTALL_MICRO=true
         INSTALL_SLACK=true
+        INSTALL_TEAMS=true
         INSTALL_JB_TOOLBOX=false
         INSTALL_JB_RIDER=false
         INSTALL_JB_DATAGRIP=false
@@ -464,7 +507,11 @@ interactive_menu() {
         INSTALL_CODEX_CLI=false
         INSTALL_GEMINI_CLI=false
         SYNC_HYPR_CONFIGS=true
+        INSTALL_CHEZMOI=true
+        INSTALL_AGE=true
+        SETUP_DOTFILES_MANAGEMENT=false
         SETUP_DELL_XPS_9320=false
+        SETUP_DUAL_KEYBOARD=false
         ;;
       d|D) # Desenvolvimento completo
         INSTALL_GOOGLE_CHROME=true
@@ -478,6 +525,7 @@ interactive_menu() {
         INSTALL_NANO=true
         INSTALL_MICRO=true
         INSTALL_SLACK=true
+        INSTALL_TEAMS=true
         INSTALL_JB_TOOLBOX=false
         INSTALL_JB_RIDER=true
         INSTALL_JB_DATAGRIP=true
@@ -489,6 +537,8 @@ interactive_menu() {
         INSTALL_CODEX_CLI=true
         INSTALL_GEMINI_CLI=true
         SYNC_HYPR_CONFIGS=true
+        SETUP_DELL_XPS_9320=false
+        SETUP_DUAL_KEYBOARD=false
         if [[ "$hw_model" == *"XPS"* ]]; then
           SETUP_DELL_XPS_9320=true
         fi
@@ -702,8 +752,106 @@ setup_dell_xps_9320_webcam() {
   CONFIGURED_RUNTIMES+=("Webcam Dell XPS 9320")
 }
 
+setup_fcitx5_br_layout() {
+  local fcitx5_config_dir="$HOME/.config/fcitx5"
+  local profile_file="$fcitx5_config_dir/profile"
+  
+  # Criar diretório se não existir
+  mkdir -p "$fcitx5_config_dir"
+  
+  # Fazer backup se arquivo existir
+  if [[ -f "$profile_file" ]]; then
+    cp "$profile_file" "${profile_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    log "Backup do fcitx5 profile criado"
+  fi
+  
+  # Criar configuração com layout brasileiro
+  cat > "$profile_file" << 'EOF'
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=br
+# Default Input Method
+DefaultIM=keyboard-br
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-br
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
+EOF
+  
+  if [[ -f "$profile_file" ]]; then
+    log "Layout de teclado brasileiro configurado no fcitx5"
+    CONFIGURED_RUNTIMES+=("fcitx5 - layout brasileiro")
+  else
+    warn "Falha ao configurar fcitx5"
+  fi
+}
+
+setup_fcitx5_dual_layout() {
+  local fcitx5_config_dir="$HOME/.config/fcitx5"
+  local profile_file="$fcitx5_config_dir/profile"
+  
+  # Criar diretório se não existir
+  mkdir -p "$fcitx5_config_dir"
+  
+  # Fazer backup se arquivo existir
+  if [[ -f "$profile_file" ]]; then
+    cp "$profile_file" "${profile_file}.backup.$(date +%Y%m%d_%H%M%S)"
+    log "Backup do fcitx5 profile criado"
+  fi
+  
+  # Criar configuração com layouts duplos: BR (padrão) + US Internacional
+  cat > "$profile_file" << 'EOF'
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=br
+# Default Input Method
+DefaultIM=keyboard-br
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-br
+# Layout
+Layout=
+
+[Groups/0/Items/1]
+# Name
+Name=keyboard-us-intl
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
+EOF
+  
+  if [[ -f "$profile_file" ]]; then
+    log "Layouts duplos configurados no fcitx5: BR (padrão) + US Internacional"
+    info "Para alternar entre teclados use: Ctrl+Espaço"
+    CONFIGURED_RUNTIMES+=("fcitx5 - layouts duplos: BR + US Internacional")
+  else
+    warn "Falha ao configurar fcitx5 com layouts duplos"
+  fi
+}
+
 setup_dell_xps_9320_optimizations() {
   info "Aplicando otimizações para Dell XPS 13 Plus (9320)"
+  
+  # Configurar layout(s) de teclado no fcitx5
+  if [[ "$SETUP_DUAL_KEYBOARD" == true ]]; then
+    info "Configurando layouts duplos: BR (padrão) + US Internacional no fcitx5..."
+    setup_fcitx5_dual_layout
+  else
+    info "Configurando layout de teclado brasileiro no fcitx5..."
+    setup_fcitx5_br_layout
+  fi
   
   # Instalar ferramentas de gerenciamento de energia
   pac thermald || warn "Falha ao instalar thermald"
@@ -735,26 +883,28 @@ configure_chromium_webcam() {
   # Configurar Chromium (padrão no Omarchy) para suporte à webcam no Wayland
   info "Configurando Chromium para webcam no Wayland..."
   
-  # Criar diretório de configuração se não existir
-  local chromium_config_dir="$HOME/.config/chromium-flags.conf"
+  # Criar diretórios de configuração se não existirem
+  local config_dir="$HOME/.config"
+  local chromium_flags_file="$HOME/.config/chromium-flags.conf"
   local applications_dir="$HOME/.local/share/applications"
   
+  mkdir -p "$config_dir"
   mkdir -p "$applications_dir"
   
   # 1. Criar arquivo de flags para Chromium
-  if [[ ! -f "$chromium_config_dir" ]]; then
-    cat > "$chromium_config_dir" << 'EOF'
+  if [[ ! -f "$chromium_flags_file" ]]; then
+    cat > "$chromium_flags_file" << 'EOF'
 # Flags para Chromium no Wayland com suporte à webcam
 --enable-features=WebRTCPipeWireCapturer
 --ozone-platform=wayland
 --enable-wayland-ime
 EOF
-    log "Arquivo de flags criado: $chromium_config_dir"
+    log "Arquivo de flags criado: $chromium_flags_file"
   else
     # Verificar se já tem a flag da webcam
-    if ! grep -q "WebRTCPipeWireCapturer" "$chromium_config_dir"; then
-      echo "--enable-features=WebRTCPipeWireCapturer" >> "$chromium_config_dir"
-      log "Flag WebRTCPipeWireCapturer adicionada ao $chromium_config_dir"
+    if ! grep -q "WebRTCPipeWireCapturer" "$chromium_flags_file"; then
+      echo "--enable-features=WebRTCPipeWireCapturer" >> "$chromium_flags_file"
+      log "Flag WebRTCPipeWireCapturer adicionada ao $chromium_flags_file"
     fi
   fi
   
@@ -826,6 +976,11 @@ install_core_apps() {
   if [[ "$INSTALL_SLACK" == true ]]; then
     info "Instalando Slack..."
     aur slack-desktop || warn "Falha instalando Slack (AUR)"
+  fi
+
+  if [[ "$INSTALL_TEAMS" == true ]]; then
+    info "Instalando Microsoft Teams..."
+    aur teams-for-linux || warn "Falha instalando Teams (AUR)"
   fi
   
   if [[ "$INSTALL_GOOGLE_CHROME" == true ]]; then
@@ -964,16 +1119,15 @@ EOF
     info "Instalando JetBrains Toolbox (gerenciador de IDEs)..."
     if aur jetbrains-toolbox; then
       log "JetBrains Toolbox instalado com sucesso!"
-      echo
-      echo -e "${GREEN}📌 Instruções para usar o JetBrains Toolbox:${NC}"
-      echo "   1. Execute 'jetbrains-toolbox' para abrir o gerenciador"
-      echo "   2. Faça login com sua conta JetBrains"
       
-      # Listar IDEs que devem ser instaladas via Toolbox
+      # Tentar abrir o Toolbox automaticamente para o usuário configurar
       local ides_to_install=""
+      local need_rider=false
+      local need_datagrip=false
+      
       if [[ "$INSTALL_JB_RIDER" == true ]]; then
         ides_to_install="Rider"
-        CONFIGURED_RUNTIMES+=("Rider (a ser instalado via Toolbox)")
+        need_rider=true
       fi
       if [[ "$INSTALL_JB_DATAGRIP" == true ]]; then
         if [[ -n "$ides_to_install" ]]; then
@@ -981,27 +1135,91 @@ EOF
         else
           ides_to_install="DataGrip"
         fi
-        CONFIGURED_RUNTIMES+=("DataGrip (a ser instalado via Toolbox)")
+        need_datagrip=true
       fi
       
       if [[ -n "$ides_to_install" ]]; then
-        echo -e "   3. ${YELLOW}Instale $ides_to_install através do Toolbox${NC}"
-      else
-        echo "   3. Instale as IDEs desejadas através do Toolbox"
+        echo
+        echo -e "${YELLOW}========================================${NC}"
+        echo -e "${YELLOW}     Configuração do JetBrains Toolbox${NC}"
+        echo -e "${YELLOW}========================================${NC}"
+        echo
+        echo -e "${GREEN}📌 O Toolbox precisa ser configurado para instalar: $ides_to_install${NC}"
+        echo
+        echo "Opções disponíveis:"
+        echo "  1) Abrir o Toolbox agora para configurar (recomendado)"
+        echo "  2) Instalar $ides_to_install diretamente via AUR (sem Toolbox)"
+        echo "  3) Pular e configurar manualmente depois"
+        echo
+        echo -n "Escolha uma opção (1/2/3): "
+        read -r toolbox_choice
+        
+        case "$toolbox_choice" in
+          1)
+            echo
+            info "Abrindo JetBrains Toolbox..."
+            echo -e "${YELLOW}Por favor:${NC}"
+            echo "  1. Faça login com sua conta JetBrains"
+            echo "  2. Instale $ides_to_install através da interface"
+            echo "  3. Pressione ENTER aqui quando terminar"
+            echo
+            
+            # Tentar abrir o Toolbox em background
+            if command -v jetbrains-toolbox &>/dev/null; then
+              nohup jetbrains-toolbox &>/dev/null 2>&1 &
+              echo "Toolbox aberto. Aguardando você configurar..."
+              read -p "Pressione ENTER quando terminar de instalar as IDEs..."
+              CONFIGURED_RUNTIMES+=("$ides_to_install (via Toolbox)")
+            else
+              warn "Não foi possível abrir o Toolbox automaticamente"
+              echo "Execute 'jetbrains-toolbox' manualmente para configurar"
+            fi
+            ;;
+          2)
+            echo
+            info "Instalando IDEs diretamente via AUR..."
+            # Forçar instalação via AUR
+            if [[ "$need_rider" == true ]]; then
+              info "Instalando Rider via AUR..."
+              aur rider || warn "Falha ao instalar Rider"
+            fi
+            if [[ "$need_datagrip" == true ]]; then
+              info "Instalando DataGrip via AUR..."
+              aur datagrip || warn "Falha ao instalar DataGrip"
+            fi
+            ;;
+          3)
+            echo
+            info "Configuração manual selecionada"
+            echo -e "${YELLOW}Lembre-se de abrir o Toolbox depois e instalar: $ides_to_install${NC}"
+            CONFIGURED_RUNTIMES+=("$ides_to_install (pendente instalação via Toolbox)")
+            ;;
+          *)
+            warn "Opção inválida. Configure manualmente depois."
+            ;;
+        esac
       fi
       
-      echo "   4. O Toolbox gerenciará atualizações automaticamente"
       echo
-      
-      # Marcar que não deve instalar via AUR
-      local toolbox_manages_ides=false
-      if [[ "$INSTALL_JB_RIDER" == true ]] || [[ "$INSTALL_JB_DATAGRIP" == true ]]; then
-        toolbox_manages_ides=true
-      fi
+      echo -e "${GREEN}📌 Sobre o JetBrains Toolbox:${NC}"
+      echo "   - Gerencia atualizações automaticamente"
+      echo "   - Permite múltiplas versões das IDEs"
+      echo "   - Acesse com: 'jetbrains-toolbox'"
+      echo
     else
       warn "Falha ao instalar JetBrains Toolbox"
-      # Se falhou, permitir instalação direta
-      toolbox_manages_ides=false
+      # Se falhou Toolbox, oferecer instalação direta
+      if [[ "$INSTALL_JB_RIDER" == true ]] || [[ "$INSTALL_JB_DATAGRIP" == true ]]; then
+        echo -n "Deseja instalar Rider/DataGrip diretamente via AUR? (s/N): "
+        read -r install_direct
+        if [[ "$install_direct" == "s" ]] || [[ "$install_direct" == "S" ]]; then
+          # Não zerar as flags, deixar instalar via AUR
+          log "Instalação direta via AUR será realizada"
+        else
+          INSTALL_JB_RIDER=false
+          INSTALL_JB_DATAGRIP=false
+        fi
+      fi
     fi
   else
     local toolbox_manages_ides=false
@@ -1196,6 +1414,247 @@ install_clis() {
       warn "Falha ao instalar @google/gemini-cli"
       FAILED_PACKAGES+=("@google/gemini-cli (npm)")
     fi
+  fi
+}
+
+install_chezmoi_and_age() {
+  if [[ "$INSTALL_CHEZMOI" != true ]] && [[ "$INSTALL_AGE" != true ]]; then
+    info "Pulando instalação de Chezmoi e Age (nenhum selecionado)"
+    return 0
+  fi
+  
+  info "Instalando ferramentas de gerenciamento de dotfiles..."
+  
+  # Instalar Chezmoi
+  if [[ "$INSTALL_CHEZMOI" == true ]]; then
+    info "Instalando Chezmoi..."
+    if pac chezmoi; then
+      INSTALLED_PACKAGES+=("chezmoi (pacman)")
+      log "Chezmoi instalado com sucesso"
+    else
+      warn "Falha ao instalar Chezmoi via pacman, tentando via AUR..."
+      if aur chezmoi-bin; then
+        INSTALLED_PACKAGES+=("chezmoi-bin (AUR)")
+        log "Chezmoi instalado via AUR"
+      else
+        warn "Falha ao instalar Chezmoi"
+        FAILED_PACKAGES+=("chezmoi")
+      fi
+    fi
+  fi
+  
+  # Instalar Age
+  if [[ "$INSTALL_AGE" == true ]]; then
+    info "Instalando Age..."
+    if pac age; then
+      INSTALLED_PACKAGES+=("age (pacman)")
+      log "Age instalado com sucesso"
+    else
+      warn "Falha ao instalar Age via pacman, tentando via AUR..."
+      if aur age; then
+        INSTALLED_PACKAGES+=("age (AUR)")
+        log "Age instalado via AUR"
+      else
+        warn "Falha ao instalar Age"
+        FAILED_PACKAGES+=("age")
+      fi
+    fi
+  fi
+}
+
+setup_dotfiles_management() {
+  if [[ "$SETUP_DOTFILES_MANAGEMENT" != true ]]; then
+    info "Pulando configuração de gerenciamento de dotfiles (não selecionado)"
+    return 0
+  fi
+  
+  if ! command -v chezmoi >/dev/null 2>&1; then
+    warn "Chezmoi não encontrado. Pulando configuração de dotfiles."
+    return 0
+  fi
+  
+  if ! command -v age >/dev/null 2>&1; then
+    warn "Age não encontrado. Pulando configuração de dotfiles."
+    return 0
+  fi
+  
+  info "Configurando gerenciamento de dotfiles com Chezmoi e Age..."
+  
+  # Verificar se já existe um repositório de dotfiles configurado
+  if [[ -d "$HOME/.local/share/chezmoi" ]]; then
+    warn "Repositório de dotfiles já existe em ~/.local/share/chezmoi"
+    echo -n "Deseja reconfigurar? (s/N): "
+    read -r reconfigure
+    if [[ "$reconfigure" != "s" ]] && [[ "$reconfigure" != "S" ]]; then
+      info "Mantendo configuração existente"
+      return 0
+    fi
+  fi
+  
+  echo
+  echo -e "${CYAN}========================================${NC}"
+  echo -e "${CYAN}     Configuração de Dotfiles${NC}"
+  echo -e "${CYAN}========================================${NC}"
+  echo
+  echo "Para configurar o gerenciamento de dotfiles, você precisa:"
+  echo "1. Um repositório Git com seus dotfiles"
+  echo "2. Uma chave Age para criptografia (opcional)"
+  echo
+  echo "Opções disponíveis:"
+  echo "  1) Configurar com repositório existente"
+  echo "  2) Criar novo repositório de dotfiles"
+  echo "  3) Configurar apenas Chezmoi (sem Age)"
+  echo "  4) Pular configuração (configurar manualmente depois)"
+  echo
+  echo -n "Escolha uma opção (1/2/3/4): "
+  read -r dotfiles_choice
+  
+  case "$dotfiles_choice" in
+    1)
+      echo
+      echo -n "Digite a URL do seu repositório de dotfiles: "
+      read -r repo_url
+      if [[ -n "$repo_url" ]]; then
+        info "Inicializando Chezmoi com repositório: $repo_url"
+        if chezmoi init "$repo_url"; then
+          log "Repositório inicializado com sucesso"
+          
+          # Perguntar sobre chave Age
+          echo -n "Deseja configurar criptografia Age? (s/N): "
+          read -r use_age
+          if [[ "$use_age" == "s" ]] || [[ "$use_age" == "S" ]]; then
+            setup_age_encryption
+          fi
+          
+          # Aplicar dotfiles
+          echo -n "Deseja aplicar os dotfiles agora? (s/N): "
+          read -r apply_now
+          if [[ "$apply_now" == "s" ]] || [[ "$apply_now" == "S" ]]; then
+            info "Aplicando dotfiles..."
+            chezmoi apply
+            log "Dotfiles aplicados com sucesso"
+          fi
+          
+          CONFIGURED_RUNTIMES+=("Chezmoi - repositório configurado: $repo_url")
+        else
+          warn "Falha ao inicializar repositório"
+        fi
+      fi
+      ;;
+    2)
+      echo
+      echo "Criando novo repositório de dotfiles..."
+      echo -n "Digite o nome do repositório (ex: dotfiles): "
+      read -r repo_name
+      if [[ -n "$repo_name" ]]; then
+        local repo_dir="$HOME/$repo_name"
+        if mkdir -p "$repo_dir" && cd "$repo_dir"; then
+          info "Inicializando repositório Git em: $repo_dir"
+          git init
+          
+          # Criar estrutura básica
+          mkdir -p home
+          echo "# $repo_name" > README.md
+          echo "Dotfiles gerenciados com Chezmoi" >> README.md
+          
+          # Criar arquivo de configuração Chezmoi
+          cat > .chezmoi.toml << EOF
+[data]
+  name = "$(whoami)"
+  email = "$(git config --global user.email 2>/dev/null || echo 'seu.email@exemplo.com')"
+  hostname = "$(hostname)"
+EOF
+          
+          # Fazer commit inicial
+          git add .
+          git commit -m "Initial commit: dotfiles setup"
+          
+          log "Repositório criado em: $repo_dir"
+          echo "Para conectar ao GitHub/GitLab:"
+          echo "  1. Crie um repositório remoto"
+          echo "  2. Execute: git remote add origin <URL>"
+          echo "  3. Execute: git push -u origin main"
+          echo
+          echo "Para usar com Chezmoi:"
+          echo "  chezmoi init $repo_dir"
+          
+          CONFIGURED_RUNTIMES+=("Novo repositório de dotfiles: $repo_dir")
+        else
+          warn "Falha ao criar repositório"
+        fi
+      fi
+      ;;
+    3)
+      echo
+      info "Configurando Chezmoi sem criptografia..."
+      echo -n "Digite a URL do seu repositório de dotfiles: "
+      read -r repo_url
+      if [[ -n "$repo_url" ]]; then
+        if chezmoi init "$repo_url"; then
+          log "Chezmoi configurado sem criptografia"
+          CONFIGURED_RUNTIMES+=("Chezmoi - sem criptografia: $repo_url")
+        else
+          warn "Falha ao configurar Chezmoi"
+        fi
+      fi
+      ;;
+    4)
+      echo
+      info "Configuração manual selecionada"
+      echo -e "${YELLOW}Para configurar manualmente:${NC}"
+      echo "  1. Instale Chezmoi: chezmoi init <repo-url>"
+      echo "  2. Configure Age: age-keygen -o ~/.config/age/keys.txt"
+      echo "  3. Aplique dotfiles: chezmoi apply"
+      echo
+      echo "Documentação: https://www.chezmoi.io/"
+      ;;
+    *)
+      warn "Opção inválida. Configure manualmente depois."
+      ;;
+  esac
+}
+
+setup_age_encryption() {
+  info "Configurando criptografia Age..."
+  
+  local age_config_dir="$HOME/.config/age"
+  local age_keys_file="$age_config_dir/keys.txt"
+  
+  # Criar diretório de configuração
+  mkdir -p "$age_config_dir"
+  
+  # Verificar se já existe uma chave
+  if [[ -f "$age_keys_file" ]]; then
+    warn "Chave Age já existe em $age_keys_file"
+    echo -n "Deseja gerar uma nova chave? (s/N): "
+    read -r new_key
+    if [[ "$new_key" != "s" ]] && [[ "$new_key" != "S" ]]; then
+      info "Usando chave existente"
+      return 0
+    fi
+  fi
+  
+  # Gerar nova chave Age
+  info "Gerando nova chave Age..."
+  if age-keygen -o "$age_keys_file"; then
+    log "Chave Age gerada com sucesso"
+    
+    # Mostrar chave pública
+    echo
+    echo -e "${GREEN}Chave pública Age:${NC}"
+    echo "----------------------------------------"
+    age-keygen -y "$age_keys_file"
+    echo "----------------------------------------"
+    echo
+    echo -e "${YELLOW}⚠️  IMPORTANTE:${NC}"
+    echo "   - Guarde a chave pública acima no seu repositório de dotfiles"
+    echo "   - A chave privada está em: $age_keys_file"
+    echo "   - NUNCA compartilhe a chave privada"
+    echo
+    
+    CONFIGURED_RUNTIMES+=("Age - criptografia configurada")
+  else
+    warn "Falha ao gerar chave Age"
   fi
 }
 
@@ -1411,6 +1870,27 @@ print_summary() {
     echo "   - Comando: 'espanso edit' para editar configurações"
   fi
   
+  # Nota sobre Chezmoi e Age
+  if [[ "$INSTALL_CHEZMOI" == true ]] || [[ "$INSTALL_AGE" == true ]]; then
+    echo
+    echo -e "${GREEN}📌 Nota sobre Gerenciamento de Dotfiles:${NC}"
+    if [[ "$INSTALL_CHEZMOI" == true ]]; then
+      echo "   - Chezmoi instalado para gerenciar dotfiles"
+      echo "   - Comandos básicos: chezmoi init, chezmoi apply, chezmoi diff"
+      echo "   - Documentação: https://www.chezmoi.io/"
+    fi
+    if [[ "$INSTALL_AGE" == true ]]; then
+      echo "   - Age instalado para criptografia de arquivos"
+      echo "   - Comandos básicos: age-keygen, age -e, age -d"
+      echo "   - Documentação: https://age-encryption.org/"
+    fi
+    if [[ "$SETUP_DOTFILES_MANAGEMENT" == true ]]; then
+      echo "   - Configuração de dotfiles foi realizada"
+      echo "   - Para aplicar mudanças: chezmoi apply"
+      echo "   - Para ver diferenças: chezmoi diff"
+    fi
+  fi
+  
   # Nota sobre Chromium (sempre configurado)
   echo
   echo -e "${GREEN}📌 Nota sobre Chromium (padrão no Omarchy):${NC}"
@@ -1544,6 +2024,7 @@ main() {
   [[ "$INSTALL_NANO" == true ]] && echo "  • Nano (editor de texto)"
   [[ "$INSTALL_MICRO" == true ]] && echo "  • Micro (editor de texto moderno)"
   [[ "$INSTALL_SLACK" == true ]] && echo "  • Slack (comunicação empresarial)"
+  [[ "$INSTALL_TEAMS" == true ]] && echo "  • Microsoft Teams (comunicação empresarial)"
   [[ "$INSTALL_JB_TOOLBOX" == true ]] && echo "  • JetBrains Toolbox"
   if [[ "$INSTALL_JB_TOOLBOX" == true ]]; then
     [[ "$INSTALL_JB_RIDER" == true ]] && echo "  • Rider (via Toolbox)"
@@ -1559,8 +2040,12 @@ main() {
   [[ "$INSTALL_CLAUDE_CODE" == true ]] && echo "  • Claude Code CLI"
   [[ "$INSTALL_CODEX_CLI" == true ]] && echo "  • Codex CLI (OpenAI)"
   [[ "$INSTALL_GEMINI_CLI" == true ]] && echo "  • Gemini CLI (Google)"
+  [[ "$INSTALL_CHEZMOI" == true ]] && echo "  • Chezmoi (gerenciador de dotfiles)"
+  [[ "$INSTALL_AGE" == true ]] && echo "  • Age (criptografia de arquivos)"
   [[ "$SYNC_HYPR_CONFIGS" == true ]] && echo "  • Sincronizar configs Hypr"
+  [[ "$SETUP_DOTFILES_MANAGEMENT" == true ]] && echo "  • Configurar gerenciamento de dotfiles"
   [[ "$SETUP_DELL_XPS_9320" == true ]] && echo "  • Configurações Dell XPS 9320"
+  [[ "$SETUP_DUAL_KEYBOARD" == true ]] && echo "  • Teclados duplos BR + US Internacional"
   echo
   echo -n "Deseja continuar? (s/N): "
   read -r confirm
@@ -1581,6 +2066,8 @@ main() {
   activate_mise_in_shell
   configure_mise_runtimes
   install_clis
+  install_chezmoi_and_age
+  setup_dotfiles_management
   sync_hypr_configs
   
   print_summary
