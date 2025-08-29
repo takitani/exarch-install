@@ -97,11 +97,11 @@ NC='\033[0m' # No Color
 # Índice selecionado no menu
 SELECTED_INDEX=0
 
-# Configurações de log
-LOG_DIR="$HOME/.local/share/exarch-install"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
-LOG_SUMMARY="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S)_summary.txt"
+# Configurações de log - usar /tmp para facilitar limpeza
+LOG_DIR="/tmp/exarch-install-$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="$LOG_DIR/install.log"
+LOG_SUMMARY="$LOG_DIR/summary.txt"
 
 # Sistema de jobs paralelos
 declare -A BACKGROUND_JOBS
@@ -762,13 +762,20 @@ restore_dns() {
   
   if [[ -f /tmp/resolv.conf.backup.$$ ]]; then
     info "Restaurando DNS original..."
+    # Desmontar primeiro (ignorar erro se não estava montado)
     sudo umount /etc/resolv.conf 2>/dev/null || true
-    sudo mv /tmp/resolv.conf.backup.$$ /etc/resolv.conf
-    log "DNS original restaurado"
+    # Usar cp ao invés de mv para evitar erro "device busy"
+    sudo cp /tmp/resolv.conf.backup.$$ /etc/resolv.conf 2>/dev/null || {
+      warn "Não foi possível restaurar DNS automaticamente"
+      warn "Execute manualmente: sudo cp /tmp/resolv.conf.backup.$$ /etc/resolv.conf"
+    }
+    # Remover backup
+    sudo rm -f /tmp/resolv.conf.backup.$$ 2>/dev/null || true
+    log "DNS original restaurado (ou tentativa feita)"
   fi
   
   # Limpar arquivo temporário
-  sudo rm -f /tmp/resolv.conf.temp
+  sudo rm -f /tmp/resolv.conf.temp 2>/dev/null || true
 }
 
 require_sudo() {
@@ -2377,14 +2384,26 @@ post_install_options() {
   echo -e "${GREEN}📁 ARQUIVOS DE LOG GERADOS${NC}"
   echo "======================================"
   echo
-  echo -e "${CYAN}Log completo:${NC}"
-  echo "  $LOG_FILE"
+  echo -e "${CYAN}📁 Logs salvos em:${NC}"
+  echo -e "  Diretório: ${BOLD}$LOG_DIR${NC}"
+  echo -e "  Log completo: $LOG_FILE"
+  echo -e "  Resumo: $LOG_SUMMARY"
   echo
-  echo -e "${CYAN}Sumário de instalação:${NC}"
-  echo "  $LOG_SUMMARY"
-  echo
-  echo -e "${YELLOW}💡 Dica:${NC} Use 'cat $LOG_SUMMARY' para ver o resumo"
-  echo -e "${YELLOW}💡 Dica:${NC} Use 'less $LOG_FILE' para ver o log completo"
+  echo -n "Deseja visualizar o resumo agora? (s/N): "
+  read -r view_log
+  if [[ "$view_log" == "s" ]] || [[ "$view_log" == "S" ]]; then
+    echo
+    if [[ -f "$LOG_SUMMARY" ]]; then
+      echo "=== RESUMO DA INSTALAÇÃO ==="
+      cat "$LOG_SUMMARY"
+    else
+      echo "=== ÚLTIMAS 50 LINHAS DO LOG ==="
+      tail -50 "$LOG_FILE" 2>/dev/null || echo "Log não encontrado"
+    fi
+    echo
+  fi
+  echo -e "${YELLOW}💡 Dica:${NC} Para ver o log completo: ${BOLD}less $LOG_FILE${NC}"
+  echo -e "${YELLOW}💡 Dica:${NC} Os logs serão removidos ao reiniciar (estão em /tmp)"
   echo
 }
 
@@ -2513,6 +2532,47 @@ main() {
   
   print_summary
   post_install_options
+  
+  # Salvar relatório final
+  save_final_report
 }
+
+# Função para salvar relatório final
+save_final_report() {
+  {
+    echo "=== RELATÓRIO FINAL DA INSTALAÇÃO ==="
+    echo "Data/Hora: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo
+    
+    if [[ ${#INSTALLED_PACKAGES[@]} -gt 0 ]]; then
+      echo "PACOTES INSTALADOS (${#INSTALLED_PACKAGES[@]}):"
+      printf ' - %s\n' "${INSTALLED_PACKAGES[@]}"
+      echo
+    fi
+    
+    if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
+      echo "PACOTES QUE FALHARAM (${#FAILED_PACKAGES[@]}):"
+      printf ' - %s\n' "${FAILED_PACKAGES[@]}"
+      echo
+    fi
+    
+    if [[ ${#SKIPPED_PACKAGES[@]} -gt 0 ]]; then
+      echo "PACOTES PULADOS (${#SKIPPED_PACKAGES[@]}):"
+      printf ' - %s\n' "${SKIPPED_PACKAGES[@]}"
+      echo
+    fi
+    
+    if [[ ${#CONFIGURED_RUNTIMES[@]} -gt 0 ]]; then
+      echo "RUNTIMES CONFIGURADOS (${#CONFIGURED_RUNTIMES[@]}):"
+      printf ' - %s\n' "${CONFIGURED_RUNTIMES[@]}"
+      echo
+    fi
+    
+    echo "=== FIM DO RELATÓRIO ==="
+  } >> "$LOG_SUMMARY" 2>/dev/null || true
+}
+
+# Garantir que DNS seja restaurado ao sair
+trap 'save_final_report 2>/dev/null || true; restore_dns 2>/dev/null || true' EXIT INT TERM
 
 main "$@"
