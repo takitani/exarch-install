@@ -824,13 +824,8 @@ setup_temporary_dns() {
 
 # Restaurar DNS original
 restore_dns() {
-  if [[ "$DNS_RESTORED" == true ]]; then
-    return 0
-  fi
-  
   if [[ "$DEBUG_MODE" == true ]]; then
     info "[DEBUG] Restauração de DNS simulada"
-    DNS_RESTORED=true
     return 0
   fi
   
@@ -877,12 +872,10 @@ ensure_tools() {
     log "Pacotes base OK"
   fi
 
-  info "[DEBUG] Verificando se yay está disponível..."
   if ! command -v yay >/dev/null 2>&1; then
     err "yay não encontrado. O Omarchy deveria trazer o yay. Aborte ou instale o yay manualmente."
     exit 1
   fi
-  info "[DEBUG] yay encontrado: $(command -v yay)"
   log "AUR helper: yay"
 }
 
@@ -1597,11 +1590,7 @@ EOF
       
       # Habilitar e iniciar o serviço awsvpnclient
       info "Habilitando serviço AWS VPN Client..."
-      if [[ "$DEBUG_MODE" == true ]]; then
-        info "[DEBUG] Habilitando serviço AWS VPN Client (simulado)"
-      else
-        sudo systemctl enable --now awsvpnclient || warn "Falha ao habilitar awsvpnclient.service"
-      fi
+      sudo systemctl enable --now awsvpnclient || warn "Falha ao habilitar awsvpnclient.service"
       
       CONFIGURED_RUNTIMES+=("AWS VPN Client (serviços configurados)")
     else
@@ -1889,10 +1878,7 @@ install_clis() {
   # Claude Code CLI
   if [[ "$INSTALL_CLAUDE_CODE" == true ]]; then
     info "Instalando Claude Code CLI..."
-    if [[ "$DEBUG_MODE" == true ]]; then
-      info "[DEBUG] Instalação simulada: npm install -g @anthropic-ai/claude-code"
-      INSTALLED_PACKAGES+=("@anthropic-ai/claude-code (npm) [DEBUG]")
-    elif npm install -g @anthropic-ai/claude-code; then
+    if npm install -g @anthropic-ai/claude-code; then
       INSTALLED_PACKAGES+=("@anthropic-ai/claude-code (npm)")
     else
       warn "Falha ao instalar @anthropic-ai/claude-code"
@@ -1903,10 +1889,7 @@ install_clis() {
   # Codex CLI
   if [[ "$INSTALL_CODEX_CLI" == true ]]; then
     info "Instalando Codex CLI..."
-    if [[ "$DEBUG_MODE" == true ]]; then
-      info "[DEBUG] Instalação simulada: npm install -g @openai/codex"
-      INSTALLED_PACKAGES+=("@openai/codex (npm) [DEBUG]")
-    elif npm install -g @openai/codex; then
+    if npm install -g @openai/codex; then
       INSTALLED_PACKAGES+=("@openai/codex (npm)")
     else
       warn "Falha ao instalar @openai/codex"
@@ -1917,10 +1900,7 @@ install_clis() {
   # Gemini CLI
   if [[ "$INSTALL_GEMINI_CLI" == true ]]; then
     info "Instalando Gemini CLI..."
-    if [[ "$DEBUG_MODE" == true ]]; then
-      info "[DEBUG] Instalação simulada: npm install -g @google/gemini-cli"
-      INSTALLED_PACKAGES+=("@google/gemini-cli (npm) [DEBUG]")
-    elif npm install -g @google/gemini-cli; then
+    if npm install -g @google/gemini-cli; then
       INSTALLED_PACKAGES+=("@google/gemini-cli (npm)")
     else
       warn "Falha ao instalar @google/gemini-cli"
@@ -2643,11 +2623,8 @@ main() {
   write_summary "=========================================="
   write_summary ""
   
-  info "[DEBUG] Iniciando require_sudo..."
   require_sudo
-  info "[DEBUG] Iniciando ensure_tools..."
   ensure_tools
-  info "[DEBUG] Iniciando install_core_apps..."
   install_core_apps
   
   if [[ "$SETUP_DELL_XPS_9320" == true ]]; then
@@ -2704,23 +2681,7 @@ save_final_report() {
   } >> "$LOG_SUMMARY" 2>/dev/null || true
 }
 
-# Variável para controlar se o DNS já foi restaurado
-DNS_RESTORED=false
-
-# Função para sair limpo
-cleanup_and_exit() {
-  if [[ "$DNS_RESTORED" != true ]]; then
-    save_final_report 2>/dev/null || true
-    restore_dns 2>/dev/null || true
-    DNS_RESTORED=true
-  fi
-  exit 0
-}
-
 # Garantir que DNS seja restaurado ao sair
-trap cleanup_and_exit EXIT TERM
-
-# Tratamento específico para Ctrl+C
-trap 'echo -e "\n${YELLOW}Interrompendo instalação...${NC}"; cleanup_and_exit' INT
+trap 'save_final_report 2>/dev/null || true; restore_dns 2>/dev/null || true' EXIT INT TERM
 
 main "$@"
