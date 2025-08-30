@@ -35,6 +35,8 @@ DEFAULT_INSTALL_CHEZMOI=true
 DEFAULT_INSTALL_AGE=true
 DEFAULT_SETUP_DOTFILES_MANAGEMENT=false
 DEFAULT_SETUP_DEV_PGPASS=false
+DEFAULT_SETUP_REMMINA_CONNECTIONS=false
+DEFAULT_ENABLE_REMMINA_MODULE=true
 
 # Runtime defaults
 DEFAULT_NODE="lts"
@@ -100,6 +102,8 @@ init_config_variables() {
   INSTALL_AGE=${INSTALL_AGE:-$DEFAULT_INSTALL_AGE}
   SETUP_DOTFILES_MANAGEMENT=${SETUP_DOTFILES_MANAGEMENT:-$DEFAULT_SETUP_DOTFILES_MANAGEMENT}
   SETUP_DEV_PGPASS=${SETUP_DEV_PGPASS:-$DEFAULT_SETUP_DEV_PGPASS}
+  SETUP_REMMINA_CONNECTIONS=${SETUP_REMMINA_CONNECTIONS:-$DEFAULT_SETUP_REMMINA_CONNECTIONS}
+  ENABLE_REMMINA_MODULE=${ENABLE_REMMINA_MODULE:-$DEFAULT_ENABLE_REMMINA_MODULE}
   
   # Runtime versions
   DEFAULT_NODE=${DEFAULT_NODE:-$DEFAULT_NODE}
@@ -156,6 +160,7 @@ parse_command_line() {
   DEBUG_MODE=false
   FORCE_XPS=false
   TEST_1PASS_MODE=false
+  TEST_REMMINA_MODE=false
   
   for arg in "$@"; do
     case "$arg" in
@@ -170,6 +175,10 @@ parse_command_line() {
       --1pass)
         TEST_1PASS_MODE=true
         info "🔐 1PASSWORD TEST MODE - Testing .pgpass configuration only"
+        ;;
+      --remmina)
+        TEST_REMMINA_MODE=true
+        info "🖥️ REMMINA DEBUG MODE - Testing RDP connection generation"
         ;;
       --help|-h)
         show_help
@@ -197,6 +206,7 @@ show_help() {
   echo "  --debug     Enable debug mode (simulation only)"
   echo "  --xps       Force Dell XPS 13 Plus mode"
   echo "  --1pass     Test 1Password .pgpass configuration only"
+  echo "  --remmina   Test Remmina RDP connection generation (creates sample files)"
   echo "  --help, -h  Show this help message"
   echo
   echo "Configuration:"
@@ -250,6 +260,8 @@ INSTALL_CHEZMOI=$INSTALL_CHEZMOI
 INSTALL_AGE=$INSTALL_AGE
 SETUP_DOTFILES_MANAGEMENT=$SETUP_DOTFILES_MANAGEMENT
 SETUP_DEV_PGPASS=$SETUP_DEV_PGPASS
+SETUP_REMMINA_CONNECTIONS=$SETUP_REMMINA_CONNECTIONS
+ENABLE_REMMINA_MODULE=$ENABLE_REMMINA_MODULE
 
 # Runtime versions
 DEFAULT_NODE="$DEFAULT_NODE"

@@ -20,6 +20,7 @@ source "$SCRIPT_DIR/config/profiles.conf"
 source "$SCRIPT_DIR/modules/1password.sh"
 source "$SCRIPT_DIR/modules/development.sh"
 source "$SCRIPT_DIR/modules/dell-xps.sh"
+source "$SCRIPT_DIR/modules/remmina.sh"
 
 # ======================================
 # MENU SYSTEM
@@ -90,7 +91,8 @@ show_menu() {
     "INSTALL_CHEZMOI:chezmoi dotfiles manager" \
     "INSTALL_AGE:Age encryption" \
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
-    "SETUP_DEV_PGPASS:Dev .pgpass via 1Password"
+    "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
+    "SETUP_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
   
   echo
   show_menu_controls
@@ -145,6 +147,10 @@ show_menu_controls() {
   
   if is_1pass_test_mode; then
     echo -e "  ${CYAN}1PASSWORD TEST MODE${NC}"
+  fi
+  
+  if is_remmina_test_mode; then
+    echo -e "  ${CYAN}REMMINA DEBUG MODE${NC}"
   fi
 }
 
@@ -311,6 +317,11 @@ execute_installation_modules() {
     setup_1password_complete
   fi
   
+  # Remmina connections (standalone)
+  if module_enabled "remmina"; then
+    setup_remmina_connections_complete
+  fi
+  
   # Dell XPS optimizations
   if module_enabled "dell-xps"; then
     setup_dell_xps_9320_complete
@@ -368,6 +379,9 @@ module_enabled() {
       ;;
     "1password")
       [[ "${ENABLE_1PASSWORD_MODULE:-true}" == "true" ]] && [[ "${SETUP_DEV_PGPASS:-false}" == "true" ]]
+      ;;
+    "remmina")
+      [[ "${ENABLE_REMMINA_MODULE:-true}" == "true" ]] && [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]
       ;;
     "dell-xps") 
       [[ "${ENABLE_DELL_XPS_MODULE:-true}" == "true" ]] && [[ "${SETUP_DELL_XPS_9320:-false}" == "true" ]]
@@ -473,6 +487,10 @@ show_final_report() {
     echo "• Your .pgpass file has been configured for database access"
   fi
   
+  if [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]; then
+    echo "• Remmina RDP connections have been generated from 1Password"
+  fi
+  
   echo "• Log files saved to: $LOG_DIR"
   
   if [[ ${#FAILED_PACKAGES[@]} -gt 0 ]]; then
@@ -497,6 +515,11 @@ main() {
   # Handle special modes
   if is_1pass_test_mode; then
     test_1password_mode
+    exit $?
+  fi
+  
+  if is_remmina_test_mode; then
+    test_remmina_mode
     exit $?
   fi
   
