@@ -270,6 +270,137 @@ age -d -i ~/.config/age/keys.txt arquivo.txt.age > arquivo.txt
 - **Age**: https://age-encryption.org/
 - **Exemplos**: https://github.com/twpayne/chezmoi/tree/master/docs/examples
 
+## 🔐 Configuração Automática: PostgreSQL .pgpass via 1Password
+
+### Funcionalidade
+
+O script oferece integração completa com 1Password CLI para gerar automaticamente arquivos `.pgpass` a partir de credenciais armazenadas no 1Password.
+
+### Configuração Personalizada
+
+Crie um arquivo `.env` na pasta do projeto para configurar suas informações:
+
+```bash
+# .env
+ONEPASSWORD_URL="https://suaempresa.1password.com/"
+ONEPASSWORD_EMAIL="seu.email@empresa.com"  # Opcional
+```
+
+### Como usar
+
+#### Setup inicial (primeira vez)
+```bash
+# Script auxiliar para configuração guiada
+./setup-1password-pgpass.sh
+```
+
+#### Gerar .pgpass
+```bash
+# Modo teste - gera .pgpass_debug
+./install.sh --1pass
+
+# Modo produção - via menu interativo
+./install.sh
+# Selecione: "Configurar ambiente dev (.pgpass via 1Password)"
+```
+
+### Recursos
+
+- **Instalação automática** do 1Password CLI e jq
+- **Configuração interativa** da conta 1Password
+- **Login automático** com detecção de conta
+- **Busca inteligente** de credenciais com categoria "Database"
+- **Menu de seleção** para escolher quais credenciais incluir
+- **Backup automático** de .pgpass existente
+- **Permissões corretas** (600) aplicadas automaticamente
+
+### Fluxo do processo
+
+1. Verifica/instala dependências (jq, 1password-cli)
+2. Configura conta 1Password se necessário
+3. Faz login automático
+4. Busca credenciais de banco de dados
+5. Apresenta menu de seleção
+6. Gera .pgpass com formato correto
+7. Aplica permissões de segurança
+
+### Troubleshooting
+
+**1Password CLI não instala:**
+- O AUR pode estar fora do ar
+- Instale manualmente: https://1password.com/downloads/command-line/
+
+**Credenciais não aparecem:**
+- Certifique-se que têm categoria "Database" no 1Password
+- Verifique se está autenticado: `op vault list`
+
+**Erro de autenticação:**
+- Execute: `op signin` manualmente
+- Ou use: `./setup-1password-pgpass.sh` para configuração guiada
+
+## 🎥 Solução Automática: Pipewire Camera no Chrome/Chromium
+
+### O Problema
+
+Por padrão, o Chrome e Chromium no Wayland/Arch Linux não conseguem acessar a webcam através do Pipewire, mesmo com as flags de linha de comando configuradas corretamente. As flags ficam como "Default" no `chrome://flags` ao invés de "Enabled".
+
+### Nossa Solução
+
+Este script implementa uma **solução completa e automática** que:
+
+1. **Configura flags de linha de comando** em `~/.config/chromium-flags.conf` e `~/.config/chrome-flags.conf`:
+   ```bash
+   --enable-webrtc-pipewire-camera
+   --enable-features=WebRTCPipeWireCapturer
+   --ozone-platform=wayland
+   --enable-wayland-ime
+   ```
+
+2. **Modifica arquivos .desktop** para incluir as flags automaticamente quando aberto pelo menu do sistema
+
+3. **🔑 INOVAÇÃO: Força as flags como "Enabled" internamente** modificando os arquivos de configuração do navegador:
+   - `~/.config/chromium/Default/Preferences`
+   - `~/.config/chromium/Local State`
+   - `~/.config/google-chrome/Default/Preferences` 
+   - `~/.config/google-chrome/Local State`
+
+   Adicionando o campo `enabled_labs_experiments`:
+   ```json
+   {
+     "browser": {
+       "enabled_labs_experiments": [
+         "enable-webrtc-pipewire-capturer@1",
+         "enable-webrtc-pipewire-camera@1"
+       ]
+     }
+   }
+   ```
+
+### Como Funciona
+
+O script `apply_pipewire_camera_patch()` é executado automaticamente durante a configuração e:
+
+1. **Detecta** se há navegadores rodando e os fecha temporariamente
+2. **Modifica** todos os perfis do Chromium e Chrome existentes
+3. **Cria backups** de todos os arquivos modificados
+4. **Força** as flags experimentais como "Enabled" nos arquivos internos
+5. **Garante** que as flags de linha de comando também estão presentes
+
+### Resultado
+
+Após a execução:
+- ✅ A webcam funciona imediatamente no Chrome/Chromium
+- ✅ As flags aparecem como "Enabled" em `chrome://flags`
+- ✅ Funciona em Google Meet, Discord, Zoom, etc.
+- ✅ Configuração persistente (sobrevive a updates)
+- ✅ Funciona tanto via linha de comando quanto pelo menu do sistema
+
+### Scripts Auxiliares
+
+- `enable-pipewire-camera.sh`: Script standalone para aplicar o patch
+- `enable-pipewire-camera.py`: Versão em Python (mais robusta)
+- `pipewire-camera-patch.sh`: Função modular para integração
+
 ### Troubleshooting
 
 **Problema com yay:**
