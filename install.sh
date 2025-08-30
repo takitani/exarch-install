@@ -9,9 +9,15 @@
 # - Configura mise (já instalado): Node LTS + .NET 8/9
 # ======================================
 
+# Carregar configurações do arquivo .env se existir
+if [[ -f "$(dirname "$0")/.env" ]]; then
+    source "$(dirname "$0")/.env"
+fi
+
 # Modo debug (simulação sem instalação real)
 DEBUG_MODE=false
 FORCE_XPS=false
+TEST_1PASS_MODE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -22,6 +28,10 @@ for arg in "$@"; do
     --xps)
       FORCE_XPS=true
       echo "💻 MODO XPS ATIVADO - Simulando Dell XPS 13 Plus"
+      ;;
+    --1pass)
+      TEST_1PASS_MODE=true
+      echo "🔐 MODO TESTE 1PASSWORD - Testando apenas configuração .pgpass"
       ;;
   esac
 done
@@ -67,6 +77,7 @@ SETUP_DUAL_KEYBOARD=false  # BR + US Internacional para Dell XPS
 INSTALL_CHEZMOI=true
 INSTALL_AGE=true
 SETUP_DOTFILES_MANAGEMENT=false
+SETUP_DEV_PGPASS=false
 
 DEFAULT_NODE="lts"         # Ex.: lts | 22 | 20
 DEFAULT_DOTNET_DEFAULT="9" # Default global
@@ -445,6 +456,7 @@ show_menu() {
   echo -e " ${num}) [$([ "$INSTALL_CHEZMOI" == true ] && echo '✓' || echo ' ')] Chezmoi - Gerenciador de dotfiles"; ((num++))
   echo -e " ${num}) [$([ "$INSTALL_AGE" == true ] && echo '✓' || echo ' ')] Age - Criptografia de arquivos"; ((num++))
   echo -e " ${num}) [$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo '✓' || echo ' ')] Configurar gerenciamento de dotfiles (Chezmoi + Age)"; ((num++))
+  echo -e " ${num}) [$([ "$SETUP_DEV_PGPASS" == true ] && echo '✓' || echo ' ')] Configurar ambiente dev (.pgpass via 1Password)"; ((num++))
   
   if [[ "$hw_model" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo
@@ -489,8 +501,9 @@ update_states_from_array() {
   INSTALL_CHEZMOI="${states[24]}"
   INSTALL_AGE="${states[25]}"
   SETUP_DOTFILES_MANAGEMENT="${states[26]}"
-  if [[ ${#states[@]} -gt 27 ]]; then
-    SETUP_DELL_XPS_9320="${states[27]}"
+  SETUP_DEV_PGPASS="${states[27]}"
+  if [[ ${#states[@]} -gt 28 ]]; then
+    SETUP_DELL_XPS_9320="${states[28]}"
   fi
 }
 
@@ -529,8 +542,9 @@ toggle_option() {
     24) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
     25) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
     26) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    27) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    28) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    27) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    28) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    29) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     a|A) 
       local state=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true)
       INSTALL_GOOGLE_CHROME=$state
@@ -554,6 +568,7 @@ toggle_option() {
         INSTALL_CHEZMOI=$state
         INSTALL_AGE=$state
         SETUP_DOTFILES_MANAGEMENT=$state
+        SETUP_DEV_PGPASS=$state
         if [[ "$(detect_hardware)" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
           SETUP_DELL_XPS_9320=$state
           SETUP_DUAL_KEYBOARD=$state
@@ -598,6 +613,7 @@ toggle_option() {
       INSTALL_CHEZMOI=true
       INSTALL_AGE=true
       SETUP_DOTFILES_MANAGEMENT=true
+      SETUP_DEV_PGPASS=true
       if [[ "$(detect_hardware)" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
         SETUP_DELL_XPS_9320=true
         SETUP_DUAL_KEYBOARD=true
@@ -1307,33 +1323,249 @@ setup_dell_xps_9320_optimizations() {
 }
 
 configure_chromium_webcam() {
-  # Configurar Chromium (padrão no Omarchy) para suporte à webcam no Wayland
-  info "Configurando Chromium para webcam no Wayland..."
+  # Configurar Chromium e Chrome para suporte à webcam no Wayland
+  info "Configurando Chromium e Chrome para webcam no Wayland..."
   
-  # Criar diretório de configuração se não existir
+  # Criar diretórios de configuração se não existirem
   local config_dir="$HOME/.config"
   local chromium_flags_file="$HOME/.config/chromium-flags.conf"
+  local chrome_flags_file="$HOME/.config/google-chrome-flags.conf"
   
   mkdir -p "$config_dir"
   
-  # 1. Criar arquivo de flags para Chromium
+  # 1. Configurar Chromium
   if [[ ! -f "$chromium_flags_file" ]]; then
     cat > "$chromium_flags_file" << 'EOF'
 # Flags para Chromium no Wayland com suporte à webcam
---enable-features=WebRTCPipeWireCapturer
+--enable-webrtc-pipewire-camera
 --ozone-platform=wayland
 --enable-wayland-ime
 EOF
-    log "Arquivo de flags criado: $chromium_flags_file"
+    log "Arquivo de flags do Chromium criado: $chromium_flags_file"
   else
     # Verificar se já tem a flag da webcam
-    if ! grep -q "WebRTCPipeWireCapturer" "$chromium_flags_file"; then
-      echo "--enable-features=WebRTCPipeWireCapturer" >> "$chromium_flags_file"
-      log "Flag WebRTCPipeWireCapturer adicionada ao $chromium_flags_file"
+    if ! grep -q "enable-webrtc-pipewire-camera" "$chromium_flags_file"; then
+      echo "--enable-webrtc-pipewire-camera" >> "$chromium_flags_file"
+      log "Flag --enable-webrtc-pipewire-camera adicionada ao $chromium_flags_file"
     fi
   fi
   
-  CONFIGURED_RUNTIMES+=("Chromium configurado para webcam no Wayland")
+  # 2. Configurar Google Chrome
+  if [[ ! -f "$chrome_flags_file" ]]; then
+    cat > "$chrome_flags_file" << 'EOF'
+# Flags para Google Chrome no Wayland com suporte à webcam
+--enable-webrtc-pipewire-camera
+--ozone-platform=wayland
+--enable-wayland-ime
+EOF
+    log "Arquivo de flags do Google Chrome criado: $chrome_flags_file"
+  else
+    # Verificar se já tem a flag da webcam
+    if ! grep -q "enable-webrtc-pipewire-camera" "$chrome_flags_file"; then
+      echo "--enable-webrtc-pipewire-camera" >> "$chrome_flags_file"
+      log "Flag --enable-webrtc-pipewire-camera adicionada ao $chrome_flags_file"
+    fi
+  fi
+  
+  # 3. Verificar se o PipeWire está funcionando
+  if command -v pw-top >/dev/null 2>&1; then
+    info "PipeWire detectado e funcionando"
+  else
+    warn "PipeWire não encontrado. Instale pipewire para suporte completo à webcam"
+  fi
+  
+  CONFIGURED_RUNTIMES+=("Chromium e Chrome configurados para webcam no Wayland")
+  
+  # 4. Aplicar patch permanente nos arquivos .desktop
+  info "Aplicando patch permanente nos arquivos .desktop..."
+  apply_chrome_desktop_patch
+  
+  # 5. Aplicar patch completo Pipewire Camera (forçar flags como 'Enabled')
+  info "Aplicando patch completo Pipewire Camera..."
+  apply_pipewire_camera_patch
+}
+
+# Função para aplicar patch permanente nos arquivos .desktop
+apply_chrome_desktop_patch() {
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Aplicando patch nos arquivos .desktop (simulado)"
+    CONFIGURED_RUNTIMES+=("Patch .desktop aplicado (simulado)")
+    return 0
+  fi
+  
+  # Backup dos arquivos originais
+  sudo cp /usr/share/applications/google-chrome.desktop /usr/share/applications/google-chrome.desktop.backup 2>/dev/null || true
+  sudo cp /usr/share/applications/chromium.desktop /usr/share/applications/chromium.desktop.backup 2>/dev/null || true
+  
+  # Criar wrapper no sistema
+  sudo tee /usr/local/bin/chrome-wrapper > /dev/null << 'EOF'
+#!/usr/bin/env bash
+
+# Wrapper para navegador que lê flags do arquivo de configuração
+APP_NAME="$1"
+shift
+
+case "$APP_NAME" in
+    "chrome")
+        FLAGS_FILE="$HOME/.config/google-chrome-flags.conf"
+        EXEC="/usr/bin/google-chrome-stable"
+        ;;
+    "chromium")
+        FLAGS_FILE="$HOME/.config/chromium-flags.conf"
+        EXEC="/usr/bin/chromium"
+        ;;
+    *)
+        echo "Navegador não suportado: $APP_NAME"
+        exit 1
+        ;;
+esac
+
+# Ler flags do arquivo se existir
+if [[ -f "$FLAGS_FILE" ]]; then
+    while IFS= read -r line; do
+        if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+            FLAGS+=("$line")
+        fi
+    done < "$FLAGS_FILE"
+fi
+
+# Executar navegador com as flags
+exec "$EXEC" "${FLAGS[@]}" "$@"
+EOF
+  
+  sudo chmod +x /usr/local/bin/chrome-wrapper
+  
+  # Modificar arquivos .desktop globais
+  if [[ -f "/usr/share/applications/google-chrome.desktop" ]]; then
+    sudo sed -i "s|Exec=/usr/bin/google-chrome-stable|Exec=/usr/local/bin/chrome-wrapper chrome|g" /usr/share/applications/google-chrome.desktop
+    log "Patch aplicado no Google Chrome (global)"
+  fi
+  
+  if [[ -f "/usr/share/applications/chromium.desktop" ]]; then
+    sudo sed -i "s|Exec=/usr/bin/chromium|Exec=/usr/local/bin/chrome-wrapper chromium|g" /usr/share/applications/chromium.desktop
+    log "Patch aplicado no Chromium (global)"
+  fi
+  
+  # Modificar arquivos .desktop locais (se existirem)
+  if [[ -f "$HOME/.local/share/applications/google-chrome.desktop" ]]; then
+    sed -i "s|Exec=/usr/bin/google-chrome-stable|Exec=/usr/local/bin/chrome-wrapper chrome|g" "$HOME/.local/share/applications/google-chrome.desktop"
+    log "Patch aplicado no Google Chrome (local)"
+  fi
+  
+  if [[ -f "$HOME/.local/share/applications/chromium.desktop" ]]; then
+    sed -i "s|Exec=/usr/bin/chromium|Exec=/usr/local/bin/chrome-wrapper chromium|g" "$HOME/.local/share/applications/chromium.desktop"
+    log "Patch aplicado no Chromium (local)"
+  fi
+  
+  # Atualizar cache do desktop
+  update-desktop-database ~/.local/share/applications 2>/dev/null || true
+  
+  CONFIGURED_RUNTIMES+=("Patch .desktop aplicado - Chrome/Chromium abrirão com flags automaticamente")
+}
+
+# Função para aplicar o patch completo do Pipewire Camera
+# Inclui modificações nos arquivos Preferences para forçar flags como "Enabled"
+apply_pipewire_camera_patch() {
+  if [[ "$DEBUG_MODE" == true ]]; then
+    info "[DEBUG] Aplicando patch completo Pipewire Camera (simulado)"
+    return 0
+  fi
+
+  info "Aplicando patch completo Pipewire Camera..."
+  
+  # Função interna para modificar Preferences usando jq
+  modify_browser_preferences() {
+    local prefs_file="$1"
+    local browser_name="$2"
+    
+    if [[ ! -f "$prefs_file" ]]; then
+      return 1
+    fi
+    
+    # Fazer backup
+    cp "$prefs_file" "${prefs_file}.backup" 2>/dev/null || true
+    
+    # Usar jq para adicionar as flags experimentais
+    if command -v jq >/dev/null 2>&1; then
+      # Adicionar enabled_labs_experiments para forçar flags como "Enabled"
+      jq '.browser.enabled_labs_experiments = ["enable-webrtc-pipewire-capturer@1", "enable-webrtc-pipewire-camera@1"]' \
+          "$prefs_file" > "${prefs_file}.tmp" && mv "${prefs_file}.tmp" "$prefs_file"
+      log "✓ Flags Pipewire forçadas como 'Enabled' em $browser_name"
+    else
+      warn "jq não encontrado - flags não foram forçadas nos Preferences"
+    fi
+  }
+
+  # Aguardar navegadores fecharem se estiverem rodando
+  if pgrep -f "chrom(e|ium)" >/dev/null; then
+    info "Fechando navegadores para aplicar o patch..."
+    pkill -f "chrom(e|ium)" 2>/dev/null || true
+    sleep 3
+  fi
+
+  # Modificar Preferences existentes para Chromium
+  for profile_dir in "$HOME/.config/chromium/"*/; do
+    if [[ -d "$profile_dir" ]]; then
+      prefs_file="${profile_dir}Preferences"
+      if [[ -f "$prefs_file" ]]; then
+        modify_browser_preferences "$prefs_file" "Chromium ($(basename "$profile_dir"))"
+      fi
+    fi
+  done
+
+  # Modificar Local State do Chromium
+  if [[ -f "$HOME/.config/chromium/Local State" ]]; then
+    cp "$HOME/.config/chromium/Local State" "$HOME/.config/chromium/Local State.backup" 2>/dev/null || true
+    if command -v jq >/dev/null 2>&1; then
+      jq '.browser.enabled_labs_experiments = ["enable-webrtc-pipewire-capturer@1", "enable-webrtc-pipewire-camera@1"]' \
+          "$HOME/.config/chromium/Local State" > "$HOME/.config/chromium/Local State.tmp" && \
+          mv "$HOME/.config/chromium/Local State.tmp" "$HOME/.config/chromium/Local State"
+      log "✓ Local State do Chromium atualizado"
+    fi
+  fi
+
+  # Modificar Preferences existentes para Google Chrome
+  for profile_dir in "$HOME/.config/google-chrome/"*/; do
+    if [[ -d "$profile_dir" ]]; then
+      prefs_file="${profile_dir}Preferences"
+      if [[ -f "$prefs_file" ]]; then
+        modify_browser_preferences "$prefs_file" "Chrome ($(basename "$profile_dir"))"
+      fi
+    fi
+  done
+
+  # Modificar Local State do Chrome
+  if [[ -f "$HOME/.config/google-chrome/Local State" ]]; then
+    cp "$HOME/.config/google-chrome/Local State" "$HOME/.config/google-chrome/Local State.backup" 2>/dev/null || true
+    if command -v jq >/dev/null 2>&1; then
+      jq '.browser.enabled_labs_experiments = ["enable-webrtc-pipewire-capturer@1", "enable-webrtc-pipewire-camera@1"]' \
+          "$HOME/.config/google-chrome/Local State" > "$HOME/.config/google-chrome/Local State.tmp" && \
+          mv "$HOME/.config/google-chrome/Local State.tmp" "$HOME/.config/google-chrome/Local State"
+      log "✓ Local State do Chrome atualizado"
+    fi
+  fi
+
+  # Garantir que as flags de linha de comando também estão corretas
+  local chromium_flags_file="$HOME/.config/chromium-flags.conf"
+  local chrome_flags_file="$HOME/.config/google-chrome-flags.conf"
+  
+  # Adicionar flag WebRTCPipeWireCapturer se não existir
+  if [[ -f "$chromium_flags_file" ]]; then
+    if ! grep -q "enable-features=WebRTCPipeWireCapturer" "$chromium_flags_file"; then
+      echo "--enable-features=WebRTCPipeWireCapturer" >> "$chromium_flags_file"
+      log "✓ Flag WebRTCPipeWireCapturer adicionada ao Chromium"
+    fi
+  fi
+  
+  if [[ -f "$chrome_flags_file" ]]; then
+    if ! grep -q "enable-features=WebRTCPipeWireCapturer" "$chrome_flags_file"; then
+      echo "--enable-features=WebRTCPipeWireCapturer" >> "$chrome_flags_file"
+      log "✓ Flag WebRTCPipeWireCapturer adicionada ao Chrome"
+    fi
+  fi
+
+  success "Patch completo Pipewire Camera aplicado!"
+  CONFIGURED_RUNTIMES+=("Flags Pipewire forçadas como 'Enabled' nos arquivos de configuração")
 }
 
 install_core_apps() {
@@ -1972,6 +2204,560 @@ install_chezmoi_and_age() {
       fi
     fi
   fi
+}
+
+setup_dev_pgpass() {
+  if [[ "$SETUP_DEV_PGPASS" != true ]]; then
+    info "Pulando configuração de .pgpass (não selecionado)"
+    return 0
+  fi
+
+  info "Configurando ambiente dev (.pgpass via 1Password)..."
+  
+  # Definir cores para esta função (caso não estejam definidas globalmente)
+  local BOLD='\033[1m'
+  local NC='\033[0m'
+  local GREEN='\033[0;32m'
+  local YELLOW='\033[1;33m'
+  local CYAN='\033[0;36m'
+  local RED='\033[0;31m'
+  
+  # Verificar e instalar jq se necessário
+  if ! command -v jq >/dev/null 2>&1; then
+    info "Instalando jq (necessário para processar JSON)..."
+    if ! pac jq; then
+      warn "Falha ao instalar jq"
+      FAILED_PACKAGES+=("jq (necessário para .pgpass)")
+      return 1
+    fi
+  fi
+
+  # Verificar se 1Password CLI está instalado
+  if ! command -v op >/dev/null 2>&1; then
+    info "Tentando instalar 1Password CLI..."
+    if aur 1password-cli-bin || aur 1password-cli; then
+      info "✓ 1Password CLI instalado com sucesso"
+    else
+      warn "1Password CLI (op) não pôde ser instalado automaticamente"
+      echo "   Instale manualmente:"
+      echo "   - Via AUR: yay -S 1password-cli-bin"
+      echo "   - Ou baixe de: https://1password.com/downloads/command-line/"
+      FAILED_PACKAGES+=("1Password CLI requerido para .pgpass")
+      return 1
+    fi
+  fi
+
+  # Verificar se está autenticado e configurar se necessário
+  local config_file="$HOME/.config/op/config"
+  local has_accounts=false
+  
+  if [[ -f "$config_file" ]] && [[ -s "$config_file" ]]; then
+    has_accounts=true
+  fi
+  
+  # Se tem contas, verificar se está logado
+  if [[ "$has_accounts" == true ]]; then
+    if ! timeout 3 op vault list >/dev/null 2>&1; then
+      info "Fazendo login no 1Password..."
+      # Só tentar pegar o account_id se tem certeza de que há contas configuradas
+      local account_id=""
+      if timeout 3 op account list --format=json >/dev/null 2>&1; then
+        account_id=$(timeout 3 op account list --format=json 2>/dev/null | jq -r '.[0].shorthand' 2>/dev/null || echo "")
+      fi
+      
+      if [[ -n "$account_id" ]]; then
+        if ! eval $(op signin --account "$account_id"); then
+          warn "Falha no login do 1Password"
+          FAILED_PACKAGES+=("1Password autenticação necessária")
+          return 1
+        fi
+      else
+        if ! eval $(op signin); then
+          warn "Falha no login do 1Password"
+          FAILED_PACKAGES+=("1Password autenticação necessária")
+          return 1
+        fi
+      fi
+    fi
+  fi
+  
+  if [[ "$has_accounts" != true ]]; then
+    info "1Password não está configurado."
+    echo
+    echo "Escolha o método de configuração:"
+    echo "1) ${BOLD}Fluxo Móvel + Desktop${NC} (mais fácil com celular)"
+    echo "   • Usar app móvel para configurar desktop"
+    echo "   • Depois integrar CLI com desktop"
+    echo "2) ${BOLD}CLI direto${NC} (recomendado para scripts)"
+    echo "3) ${BOLD}Helper interativo${NC} (todas as opções)"
+    echo "4) ${BOLD}Configuração manual básica${NC}"
+    echo
+    echo -n "Escolha (1/2/3/4): "
+    read -r config_method
+    
+    case "$config_method" in
+      1)
+        info "Configuração Fluxo Móvel + Desktop..."
+        echo
+        echo -e "${BOLD}Passo 1: Configurar 1Password Desktop${NC}"
+        echo
+        echo "1. Primeiro, vamos verificar se o 1Password desktop está instalado:"
+        
+        # Verificar se tem desktop app
+        local desktop_installed=false
+        local desktop_paths=(
+          "/usr/bin/1password"
+          "/usr/local/bin/1password"
+          "/opt/1Password/1password"
+          "$HOME/.local/bin/1password"
+        )
+        
+        for path in "${desktop_paths[@]}"; do
+          if [[ -f "$path" ]] || [[ -d "$path" ]]; then
+            desktop_installed=true
+            break
+          fi
+        done
+        
+        # Verificar pacman/flatpak
+        if pacman -Q 1password 2>/dev/null >/dev/null; then
+          desktop_installed=true
+        elif command -v flatpak >/dev/null 2>&1 && flatpak list 2>/dev/null | grep -q "com.onepassword.OnePassword"; then
+          desktop_installed=true
+        fi
+        
+        if [[ "$desktop_installed" == false ]]; then
+          echo
+          warn "1Password desktop não está instalado."
+          echo
+          echo "Para usar o fluxo móvel, você precisa instalar primeiro:"
+          echo "• Via AUR: ${CYAN}yay -S 1password${NC}"
+          echo "• Via Flatpak: ${CYAN}flatpak install com.onepassword.OnePassword${NC}"
+          echo
+          echo "Quer instalar automaticamente via AUR? (s/n): "
+          read -r install_desktop
+          
+          if [[ "$install_desktop" =~ ^[sS] ]]; then
+            info "Instalando 1Password desktop via AUR..."
+            if aur 1password; then
+              echo -e "${GREEN}✓${NC} 1Password desktop instalado"
+              desktop_installed=true
+            else
+              warn "Falha na instalação automática"
+              echo "Instale manualmente e execute novamente"
+              FAILED_PACKAGES+=("1Password desktop necessário para fluxo móvel")
+              return 1
+            fi
+          else
+            echo "Configure manualmente e execute novamente"
+            FAILED_PACKAGES+=("1Password desktop necessário para fluxo móvel")
+            return 1
+          fi
+        else
+          echo -e "${GREEN}✓${NC} 1Password desktop detectado"
+        fi
+        
+        echo
+        echo -e "${BOLD}Passo 2: Configurar no Mobile${NC}"
+        echo
+        echo "No seu celular (app 1Password):"
+        echo "1. Abra o 1Password no celular"
+        echo "2. Toque no ícone da conta (canto superior direito)"
+        echo "3. Toque em ${BOLD}'Set up another device'${NC}"
+        echo "4. Escolha ${BOLD}'Scan QR Code'${NC}"
+        echo
+        echo "Pressione ENTER quando estiver pronto para continuar..."
+        read -r
+        
+        echo
+        echo -e "${BOLD}Passo 3: Abrir 1Password Desktop${NC}"
+        echo
+        info "Abrindo 1Password desktop..."
+        
+        # Tentar abrir o app
+        if command -v 1password >/dev/null 2>&1; then
+          1password & 2>/dev/null
+          sleep 2
+        elif command -v flatpak >/dev/null 2>&1 && flatpak list 2>/dev/null | grep -q "com.onepassword.OnePassword"; then
+          flatpak run com.onepassword.OnePassword & 2>/dev/null
+          sleep 2
+        else
+          warn "Não foi possível abrir automaticamente. Abra manualmente."
+        fi
+        
+        echo
+        echo "No 1Password desktop que abriu:"
+        echo "1. Clique em ${BOLD}'Sign in with QR Code'${NC}"
+        echo "2. Um QR code aparecerá na tela"
+        echo "3. No celular, aponte a câmera para o QR code"
+        echo "4. Confirme no celular quando solicitado"
+        echo
+        echo "Pressione ENTER quando terminar de configurar..."
+        read -r
+        
+        echo
+        echo -e "${BOLD}Passo 4: Ativar Integração CLI${NC}"
+        echo
+        echo "Agora no 1Password desktop:"
+        echo "1. Vá em ${BOLD}Settings/Preferences${NC}"
+        echo "2. Clique na aba ${BOLD}Developer${NC}"
+        echo "3. Ative ${BOLD}'Integrate with 1Password CLI'${NC}"
+        echo "4. Autorize quando solicitado"
+        echo
+        echo "Pressione ENTER quando terminar..."
+        read -r
+        
+        # Testar se funcionou
+        echo
+        info "Testando integração..."
+        if timeout 5 op account list >/dev/null 2>&1; then
+          echo -e "${GREEN}✓${NC} Integração funcionando!"
+          
+          # Testar login
+          if timeout 3 op vault list >/dev/null 2>&1; then
+            echo -e "${GREEN}✓${NC} Login automático funcionando!"
+          else
+            info "Fazendo login via desktop integration..."
+            eval $(op signin) || true
+          fi
+        else
+          warn "Integração não detectada"
+          echo "Verifique se seguiu todos os passos"
+          FAILED_PACKAGES+=("1Password integração CLI necessária")
+          return 1
+        fi
+        ;;
+        
+      2)
+        info "Configuração via CLI direto..."
+        echo
+        
+        # Guiar através do setup CLI completo
+        echo "Vamos configurar o 1Password CLI passo a passo."
+        echo
+        echo "Você precisa de um dos seguintes:"
+        echo "• ${BOLD}Emergency Kit${NC} com Setup Code (começa com A3-)"
+        echo "• ${BOLD}Dados da conta${NC}: URL, email e Secret Key"
+        echo
+        echo "O que você tem?"
+        echo "1) Setup Code do Emergency Kit"
+        echo "2) Dados completos (URL, email, Secret Key)"
+        echo "3) Não tenho nada disso"
+        echo
+        echo -n "Escolha (1/2/3): "
+        read -r config_type
+        
+        case "$config_type" in
+          1)
+            echo
+            info "Setup Code do Emergency Kit"
+            echo
+            echo -e "${BOLD}Como encontrar no app móvel:${NC}"
+            echo "1. Abra o 1Password no celular"
+            echo "2. Toque na conta (canto superior)"
+            echo "3. Toque em ${BOLD}'Get Setup Code'${NC} ou ${BOLD}'Emergency Kit'${NC}"
+            echo "4. Copie o código que começa com A3-"
+            echo
+            echo "Formato: ${CYAN}A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX${NC}"
+            echo
+            info "Digite ou cole o Setup Code:"
+            
+            # Usar URL pré-configurada se disponível
+            if [[ -n "${ONEPASSWORD_URL:-}" ]]; then
+              echo "Usando URL pré-configurada: ${ONEPASSWORD_URL}"
+              if op account add --address "${ONEPASSWORD_URL}"; then
+                echo -e "${GREEN}✓${NC} Conta adicionada via Setup Code!"
+              else
+                warn "Falha ao adicionar conta"
+                FAILED_PACKAGES+=("1Password configuração necessária")
+                return 1
+              fi
+            else
+              if op account add; then
+                echo -e "${GREEN}✓${NC} Conta adicionada via Setup Code!"
+              else
+                warn "Falha ao adicionar conta"
+                FAILED_PACKAGES+=("1Password configuração necessária")
+                return 1
+              fi
+            fi
+            ;;
+            
+          2)
+            echo
+            info "Digite os dados da conta:"
+            echo
+            
+            # Usar URL do .env se disponível
+            local url="${ONEPASSWORD_URL:-}"
+            if [[ -n "$url" ]]; then
+              info "URL detectada do arquivo de configuração: $url"
+              echo -n "Usar essa URL? (s/n): "
+              read -r use_default_url
+              
+              if [[ "$use_default_url" =~ ^[nN] ]]; then
+                echo -n "Digite a URL (ex: empresa.1password.com): "
+                read -r url
+              fi
+            else
+              echo -n "URL da conta (ex: empresa.1password.com): "
+              read -r url
+            fi
+            
+            # Usar email do .env se disponível  
+            local email="${ONEPASSWORD_EMAIL:-}"
+            if [[ -n "$email" ]]; then
+              info "Email detectado: $email"
+              echo -n "Usar esse email? (s/n): "
+              read -r use_default_email
+              
+              if [[ "$use_default_email" =~ ^[nN] ]]; then
+                echo -n "Digite o email: "
+                read -r email
+              fi
+            else
+              echo -n "Email: "
+              read -r email
+            fi
+            
+            echo -n "Secret Key: "
+            read -r secret_key
+            
+            echo
+            info "Adicionando conta..."
+            
+            if op account add --address "$url" --email "$email" --secret-key "$secret_key"; then
+              echo -e "${GREEN}✓${NC} Conta adicionada via dados manuais!"
+            else
+              warn "Falha ao adicionar conta - verifique os dados"
+              FAILED_PACKAGES+=("1Password configuração necessária")
+              return 1
+            fi
+            ;;
+            
+          3)
+            echo
+            warn "Você precisa do Emergency Kit ou dados da conta"
+            echo
+            echo "O Emergency Kit contém:"
+            echo "• Setup Code (QR code)"
+            echo "• Secret Key"
+            echo "• URL da conta"
+            echo
+            echo "Você pode encontrar em:"
+            echo "• Email de boas-vindas do 1Password"
+            echo "• PDF baixado durante o cadastro"
+            echo "• Configurações da conta no site 1password.com"
+            echo
+            echo "Configure primeiro executando: ./configure.sh"
+            FAILED_PACKAGES+=("1Password Emergency Kit necessário")
+            return 1
+            ;;
+        esac
+        ;;
+        
+      3)
+        info "Abrindo helper interativo..."
+        if [[ -x "./1password-helper.sh" ]]; then
+          if ./1password-helper.sh; then
+            info "✓ Helper concluído com sucesso"
+          else
+            warn "Helper não conseguiu configurar - configuração necessária"
+            FAILED_PACKAGES+=("1Password configuração via helper necessária")
+            return 1
+          fi
+        else
+          warn "Helper não encontrado, usando configuração básica"
+          op account add
+        fi
+        ;;
+        
+      4)
+        info "Configuração manual básica..."
+        op account add
+        ;;
+    esac
+    
+    # Fazer signin após configurar (só se chegou até aqui)
+    echo
+    info "Fazendo login no 1Password..."
+    local account_id=$(op account list --format=json 2>/dev/null | jq -r '.[0].shorthand' 2>/dev/null)
+    
+    if [[ -n "$account_id" ]]; then
+      if ! eval $(op signin --account "$account_id"); then
+        warn "Falha no login do 1Password"
+        FAILED_PACKAGES+=("1Password autenticação necessária")
+        return 1
+      fi
+    else
+      if ! eval $(op signin); then
+        warn "Falha no login do 1Password"
+        FAILED_PACKAGES+=("1Password autenticação necessária")
+        return 1
+      fi
+    fi
+    
+    info "✓ 1Password configurado e autenticado com sucesso!"
+  fi
+
+  local pgpass_file="$HOME/.pgpass"
+  local backup_file=""
+  
+  # Backup do arquivo existente se houver
+  if [[ -f "$pgpass_file" ]]; then
+    backup_file="$pgpass_file.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$pgpass_file" "$backup_file"
+    info "Backup criado: $backup_file"
+  fi
+
+  # Buscar credenciais de banco de dados no 1Password
+  info "Buscando credenciais de banco de dados no 1Password..."
+  
+  local db_items
+  if ! db_items=$(op item list --categories=database --format=json 2>/dev/null); then
+    warn "Falha ao listar credenciais do 1Password"
+    return 1
+  fi
+  
+  if [[ "$db_items" == "[]" ]] || [[ -z "$db_items" ]]; then
+    warn "Nenhuma credencial de banco de dados encontrada no 1Password"
+    info "   Certifique-se de ter credenciais com categoria 'Database' no 1Password"
+    return 1
+  fi
+
+  # Processar credenciais encontradas
+  local db_count
+  db_count=$(echo "$db_items" | jq length)
+  
+  if [[ "$db_count" -eq 0 ]]; then
+    warn "Nenhuma credencial de banco encontrada"
+    return 1
+  fi
+
+  info "Encontradas $db_count credencial(is) de banco de dados"
+  echo
+  echo "Selecione as credenciais para incluir no .pgpass:"
+  echo
+
+  # Menu de seleção
+  local selected_items=()
+  local i=1
+  
+  while IFS= read -r item; do
+    local title=$(echo "$item" | jq -r '.title')
+    local id=$(echo "$item" | jq -r '.id')
+    echo "$i) $title"
+    selected_items+=("$id:$title")
+    ((i++))
+  done < <(echo "$db_items" | jq -c '.[]')
+  
+  echo
+  echo "Digite os números das credenciais (separados por espaço) ou 'a' para todas:"
+  read -r selection
+  
+  local pgpass_entries=()
+  
+  if [[ "$selection" == "a" || "$selection" == "A" ]]; then
+    # Selecionar todas
+    for item in "${selected_items[@]}"; do
+      local item_id="${item%%:*}"
+      if ! process_database_item "$item_id" pgpass_entries; then
+        warn "Falha ao processar item: ${item##*:}"
+      fi
+    done
+  else
+    # Selecionar específicas
+    for num in $selection; do
+      if [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge 1 ]] && [[ "$num" -le "${#selected_items[@]}" ]]; then
+        local item="${selected_items[$((num-1))]}"
+        local item_id="${item%%:*}"
+        if ! process_database_item "$item_id" pgpass_entries; then
+          warn "Falha ao processar item: ${item##*:}"
+        fi
+      fi
+    done
+  fi
+
+  # Gerar arquivo .pgpass
+  if [[ ${#pgpass_entries[@]} -gt 0 ]]; then
+    {
+      echo "# .pgpass gerado automaticamente via 1Password"
+      echo "# Formato: hostname:port:database:username:password"
+      echo "# Gerado em: $(date)"
+      echo
+      for entry in "${pgpass_entries[@]}"; do
+        echo "$entry"
+      done
+    } > "$pgpass_file"
+    
+    chmod 600 "$pgpass_file"
+    
+    info "✓ Arquivo .pgpass criado com ${#pgpass_entries[@]} entrada(s)"
+    info "  Localização: $pgpass_file"
+    if [[ -n "$backup_file" ]]; then
+      info "  Backup anterior: $backup_file"
+    fi
+    
+    CONFIGURED_RUNTIMES+=("PostgreSQL .pgpass configurado (${#pgpass_entries[@]} credencial(is))")
+  else
+    warn "Nenhuma entrada válida processada"
+    return 1
+  fi
+}
+
+# Função auxiliar para processar um item de banco de dados do 1Password
+process_database_item() {
+  local item_id="$1"
+  local -n entries_ref="$2"
+  
+  local item_details
+  if ! item_details=$(op item get "$item_id" --format=json 2>/dev/null); then
+    return 1
+  fi
+  
+  # Extrair campos necessários com mais variações de labels
+  local hostname=$(echo "$item_details" | jq -r '.fields[] | select(.label=="server" or .label=="hostname" or .label=="host" or .label=="Server" or .label=="Host" or .label=="address") | .value' 2>/dev/null | head -1)
+  local port=$(echo "$item_details" | jq -r '.fields[] | select(.label=="port" or .label=="Port") | .value' 2>/dev/null | head -1)
+  local database=$(echo "$item_details" | jq -r '.fields[] | select(.label=="database" or .label=="Database" or .label=="db" or .label=="DB") | .value' 2>/dev/null | head -1)
+  local username=$(echo "$item_details" | jq -r '.fields[] | select(.label=="username" or .label=="user" or .label=="Username" or .label=="User") | .value' 2>/dev/null | head -1)
+  local password=$(echo "$item_details" | jq -r '.fields[] | select(.label=="password" or .label=="Password") | .value' 2>/dev/null | head -1)
+  
+  # Se não encontrou pelos labels, tentar pelos tipos de campo
+  [[ "$username" == "null" || -z "$username" ]] && username=$(echo "$item_details" | jq -r '.fields[] | select(.type=="T") | .value' 2>/dev/null | head -1)
+  [[ "$password" == "null" || -z "$password" ]] && password=$(echo "$item_details" | jq -r '.fields[] | select(.type=="P") | .value' 2>/dev/null | head -1)
+  
+  # Tentar extrair hostname de URLs se não encontrado
+  [[ "$hostname" == "null" || -z "$hostname" ]] && hostname=$(echo "$item_details" | jq -r '.urls[0].href' 2>/dev/null | sed 's|.*://||' | cut -d':' -f1)
+  
+  # Aplicar valores padrão
+  [[ "$port" == "null" || -z "$port" ]] && port="5432"
+  [[ "$database" == "null" || -z "$database" ]] && database="*"
+  
+  # Debug: mostrar o que foi encontrado
+  local item_title=$(echo "$item_details" | jq -r '.title' 2>/dev/null)
+  
+  # Validar campos obrigatórios (hostname, username, password são essenciais)
+  if [[ -z "$hostname" || "$hostname" == "null" ]]; then
+    warn "Item '$item_title': hostname não encontrado"
+    return 1
+  fi
+  
+  if [[ -z "$username" || "$username" == "null" ]]; then
+    warn "Item '$item_title': username não encontrado"
+    return 1
+  fi
+  
+  if [[ -z "$password" || "$password" == "null" ]]; then
+    warn "Item '$item_title': password não encontrado"
+    return 1
+  fi
+  
+  # Criar entrada .pgpass
+  local pgpass_entry="$hostname:$port:$database:$username:$password"
+  entries_ref+=("$pgpass_entry")
+  
+  echo -e "${GREEN}✓${NC} Processado: $hostname:$port:$database:$username"
+  return 0
 }
 
 setup_dotfiles_management() {
@@ -2660,6 +3446,7 @@ main() {
   install_clis
   install_chezmoi_and_age
   setup_dotfiles_management
+  setup_dev_pgpass
   sync_hypr_configs
   
   print_summary
@@ -2721,6 +3508,147 @@ cleanup_and_exit() {
 trap cleanup_and_exit EXIT TERM
 
 # Tratamento específico para Ctrl+C
-trap 'echo -e "\n${YELLOW}Interrompendo instalação...${NC}"; cleanup_and_exit' INT
+trap 'echo -e "\n${YELLOW}Interrompindo instalação...${NC}"; cleanup_and_exit' INT
+
+# Modo de teste isolado para 1Password
+if [[ "$TEST_1PASS_MODE" == true ]]; then
+  # Desativar todos os traps no modo teste
+  trap - EXIT TERM INT
+  
+  echo
+  echo -e "${EXATO_CYAN}═══════════════════════════════════════${NC}"
+  echo -e "${BOLD}Teste de Configuração .pgpass via 1Password${NC}"
+  echo -e "${EXATO_CYAN}═══════════════════════════════════════${NC}"
+  echo
+  
+  # Opção para reset antes do teste
+  echo "Opções do modo teste:"
+  echo "1) Executar teste normal"
+  echo "2) Reset 1Password (remover contas e testar do zero)"
+  echo "3) Sair"
+  echo
+  echo -n "Escolha (1/2/3): "
+  read -r test_option
+  
+  case "$test_option" in
+    1)
+      echo "Executando teste normal..."
+      ;;
+    2)
+      info "Removendo configurações do 1Password para teste limpo..."
+      op signout --forget-all 2>/dev/null || true
+      rm -f ~/.config/op/config 2>/dev/null || true
+      echo -e "${GREEN}✓ Reset concluído! Executando teste do zero...${NC}"
+      ;;
+    3|*)
+      info "Saindo do modo teste"
+      exit 0
+      ;;
+  esac
+  echo
+  
+  # Função de teste real que executa a configuração completa
+  setup_dev_pgpass_test() {
+    info "Configurando ambiente dev (.pgpass via 1Password - MODO TESTE)..."
+    
+    # Ativar o setup temporariamente para usar a função principal
+    SETUP_DEV_PGPASS=true
+    
+    # Executar versão que cria arquivo debug
+    if setup_dev_pgpass_with_debug; then
+      echo
+      echo -e "${GREEN}✓ Modo teste concluído com sucesso!${NC}"
+      echo
+      echo -e "${BOLD}Arquivos gerados:${NC}"
+      [[ -f "$HOME/.pgpass" ]] && echo "  • $HOME/.pgpass (arquivo principal)"
+      [[ -f "$HOME/.pgpass_debug" ]] && echo "  • $HOME/.pgpass_debug (versão de teste)"
+      return 0
+    else
+      echo
+      echo -e "${YELLOW}⚠ 1Password não configurado${NC}"
+      echo
+      echo "Vamos configurar agora!"
+      echo "1) Usar helper assistido (recomendado)"
+      echo "2) Configurar manualmente"
+      echo "3) Cancelar teste"
+      echo
+      echo -n "Escolha (1/2/3): "
+      read -r choice
+      
+      case "$choice" in
+        1)
+          info "Chamando helper assistido..."
+          if [[ -x "./1password-helper.sh" ]]; then
+            ./1password-helper.sh
+            if [[ $? -eq 0 ]]; then
+              info "Agora vamos tentar novamente o teste..."
+              setup_dev_pgpass_with_debug
+              return $?
+            fi
+          else
+            warn "Helper não encontrado"
+          fi
+          ;;
+        2)
+          info "Configuração manual..."
+          echo "Execute: op account add"
+          echo "Depois: op signin"
+          ;;
+        3|*)
+          info "Teste cancelado"
+          ;;
+      esac
+      return 1
+    fi
+  }
+  
+  # Versão modificada que cria .pgpass_debug também
+  setup_dev_pgpass_with_debug() {
+    # Executar a função principal
+    if ! setup_dev_pgpass; then
+      return 1
+    fi
+    
+    # Se bem-sucedido, criar versão debug
+    local pgpass_file="$HOME/.pgpass"
+    local pgpass_debug="$HOME/.pgpass_debug"
+    
+    if [[ -f "$pgpass_file" ]]; then
+      info "Criando versão de teste (.pgpass_debug)..."
+      
+      # Criar versão debug com cabeçalho
+      {
+        echo "# .pgpass_debug gerado automaticamente via 1Password (MODO TESTE)"
+        echo "# Arquivo original: $pgpass_file"
+        echo "# Gerado em: $(date)"
+        echo "# Comando: $0 --1pass"
+        echo "#"
+        echo "# Formato: hostname:port:database:username:password"
+        echo
+        cat "$pgpass_file"
+      } > "$pgpass_debug"
+      
+      chmod 600 "$pgpass_debug"
+      
+      echo
+      echo -e "${GREEN}✓ Arquivo .pgpass_debug criado!${NC}"
+      info "  Original: $pgpass_file"
+      info "  Debug: $pgpass_debug"
+      
+      echo
+      info "Conteúdo de $pgpass_debug:"
+      cat "$pgpass_debug"
+      
+      return 0
+    else
+      warn "Arquivo .pgpass não foi criado pela função principal"
+      return 1
+    fi
+  }
+  
+  # Executar teste
+  setup_dev_pgpass_test
+  exit $?
+fi
 
 main "$@"
