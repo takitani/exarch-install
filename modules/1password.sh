@@ -5,6 +5,7 @@
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh"
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/config-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/config-manager.sh"
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh"
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/remmina.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/remmina.sh"
 
 # Environment variables to control 1Password behavior
 export OP_BIOMETRIC_UNLOCK_ENABLED=false  # Prevent biometric prompts
@@ -679,12 +680,26 @@ generate_pgpass_file() {
       info "Previous backup: $backup_file"
     fi
     
+    # Ask if user wants to generate Remmina connections too (unless skipped)
+    if [[ "${SKIP_REMMINA_PROMPT:-false}" != "true" ]]; then
+      echo
+      if ask_yes_no "Generate Remmina RDP connections from 1Password as well?"; then
+        if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
+          info "Setting up Remmina connections..."
+          setup_remmina_connections_complete
+        else
+          warn "Remmina module not loaded, skipping RDP connections setup"
+        fi
+      fi
+    fi
+    
     return 0
   else
     err "No valid entries processed"
     return 1
   fi
 }
+
 
 # Test mode with debug output
 test_1password_mode() {
@@ -694,16 +709,18 @@ test_1password_mode() {
   while true; do
     echo
     echo -e "${CYAN}╔═══════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║  ${BOLD}1Password .pgpass Configuration Test${NC}${CYAN} ║${NC}"
+    echo -e "${CYAN}║  ${BOLD}1Password Integration Test Mode${NC}${CYAN} ║${NC}"
     echo -e "${CYAN}╚═══════════════════════════════════════╗${NC}"
     echo
     
     echo "Test mode options:"
-    echo "1) Execute normal test"
-    echo "2) Reset 1Password (remove accounts and test from scratch)"
-    echo "3) Exit"
+    echo "1) Generate .pgpass file only"
+    echo "2) Generate Remmina connections only"
+    echo "3) Generate both .pgpass and Remmina connections"
+    echo "4) Reset 1Password (remove accounts and test from scratch)"
+    echo "5) Exit"
     echo
-    echo -n "Choose (1/2/3): "
+    echo -n "Choose (1/2/3/4/5): "
     
     # Use timeout to prevent infinite loops
     if ! read -r -t 30 test_option; then
@@ -714,8 +731,10 @@ test_1password_mode() {
     
     case "$test_option" in
     1)
-      echo "Executing normal test..."
+      echo "Generating .pgpass file only..."
       echo
+      # Create a temporary flag to skip Remmina prompt
+      local SKIP_REMMINA_PROMPT=true
       if setup_1password_complete; then
         # Create debug file
         local debug_file="$HOME/.pgpass_debug"
@@ -754,6 +773,33 @@ test_1password_mode() {
       fi
       ;;
     2)
+      echo "Generating Remmina connections only..."
+      echo
+      if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
+        if setup_remmina_connections_complete; then
+          success "Remmina connections test completed successfully!"
+          return 0
+        else
+          err "Remmina connections test failed"
+          return 1
+        fi
+      else
+        err "Remmina module not loaded"
+        return 1
+      fi
+      ;;
+    3)
+      echo "Generating both .pgpass and Remmina connections..."
+      echo
+      if setup_1password_complete; then
+        success "Both .pgpass and Remmina test completed successfully!"
+        return 0
+      else
+        err "Combined test failed"
+        return 1
+      fi
+      ;;
+    4)
       echo "Resetting 1Password for clean test..."
       
       # Sign out CLI and remove accounts (with timeout to avoid hanging)
@@ -798,17 +844,17 @@ test_1password_mode() {
       # After successful reset, continue to show menu again
       continue
       ;;
-    3)
+    5)
       info "Exiting test mode"
       return 0
       ;;
     "")
       # Empty input - continue loop
-      warn "Please enter a valid option (1, 2, or 3)"
+      warn "Please enter a valid option (1, 2, 3, 4, or 5)"
       continue
       ;;
     *)
-      warn "Invalid option: '$test_option'. Please choose 1, 2, or 3"
+      warn "Invalid option: '$test_option'. Please choose 1, 2, 3, 4, or 5"
       continue
       ;;
     esac
