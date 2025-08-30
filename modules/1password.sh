@@ -1,0 +1,823 @@
+#!/usr/bin/env bash
+# modules/1password.sh - Complete 1Password integration module
+
+# Source required libraries
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh"
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/config-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/config-manager.sh"
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh"
+
+# Environment variables to control 1Password behavior
+export OP_BIOMETRIC_UNLOCK_ENABLED=false  # Prevent biometric prompts
+export OP_DEVICE=false  # Prevent device authentication
+export ONEPASSWORD_CLI_ONLY="${ONEPASSWORD_CLI_ONLY:-false}"  # CLI-only mode flag
+
+# 1Password CLI Installation and Setup
+install_1password_cli() {
+  info "Installing 1Password CLI..."
+  
+  if command_exists op; then
+    info "1Password CLI already installed"
+    return 0
+  fi
+  
+  if aur 1password-cli-bin || aur 1password-cli; then
+    success "1Password CLI installed successfully"
+    return 0
+  else
+    err "Failed to install 1Password CLI automatically"
+    echo "   Install manually:"
+    echo "   - Via AUR: yay -S 1password-cli-bin"
+    echo "   - Or download from: https://1password.com/downloads/command-line/"
+    return 1
+  fi
+}
+
+# Check if 1Password desktop app is installed
+detect_1password_desktop() {
+  local desktop_paths=(
+    "/usr/bin/1password"
+    "/usr/local/bin/1password"
+    "/opt/1Password/1password"
+    "$HOME/.local/bin/1password"
+  )
+  
+  for path in "${desktop_paths[@]}"; do
+    if [[ -f "$path" ]] || [[ -d "$path" ]]; then
+      return 0
+    fi
+  done
+  
+  # Check via package managers
+  if is_pacman_installed 1password || is_aur_installed 1password; then
+    return 0
+  fi
+  
+  # Check flatpak
+  if command_exists flatpak && flatpak list 2>/dev/null | grep -q "com.onepassword.OnePassword"; then
+    return 0
+  fi
+  
+  return 1
+}
+
+# Install 1Password desktop app
+install_1password_desktop() {
+  info "Installing 1Password desktop app..."
+  
+  if detect_1password_desktop; then
+    info "1Password desktop already installed"
+    return 0
+  fi
+  
+  if aur 1password; then
+    success "1Password desktop installed via AUR"
+    return 0
+  else
+    warn "Failed to install 1Password desktop automatically"
+    echo "Alternative installation methods:"
+    echo -e "• Via Flatpak: ${CYAN}flatpak install com.onepassword.OnePassword${NC}"
+    echo -e "• Via AUR manually: ${CYAN}yay -S 1password${NC}"
+    return 1
+  fi
+}
+
+# Open 1Password desktop app
+open_1password_desktop() {
+  info "Opening 1Password desktop app..."
+  
+  if command_exists 1password; then
+    1password & 2>/dev/null
+    return 0
+  fi
+  
+  # Try via flatpak
+  if command_exists flatpak && flatpak list 2>/dev/null | grep -q "com.onepassword.OnePassword"; then
+    flatpak run com.onepassword.OnePassword & 2>/dev/null
+    return 0
+  fi
+  
+  # Try via xdg-open
+  if xdg-open "1password://" 2>/dev/null; then
+    return 0
+  fi
+  
+  warn "Could not open 1Password desktop automatically"
+  return 1
+}
+
+# Check 1Password CLI account status
+check_1password_status() {
+  local config_file="$HOME/.config/op/config"
+  
+  # Check if accounts are configured
+  if [[ -f "$config_file" ]] && [[ -s "$config_file" ]]; then
+    # Check if logged in
+    if timeout 3 op vault list >/dev/null 2>&1; then
+      echo "authenticated"
+    else
+      echo "configured_not_logged_in"
+    fi
+  else
+    echo "not_configured"
+  fi
+}
+
+# 1Password CLI signin
+signin_1password_cli() {
+  info "Signing in to 1Password..."
+  
+  local account_id=""
+  if timeout 3 op account list --format=json >/dev/null 2>&1; then
+    account_id=$(timeout 3 op account list --format=json 2>/dev/null | jq -r '.[0].shorthand' 2>/dev/null || echo "")
+  fi
+  
+  if [[ -n "$account_id" ]]; then
+    if eval "$(op signin --account "$account_id")"; then
+      success "Successfully signed in to 1Password"
+      return 0
+    fi
+  else
+    if eval "$(op signin)"; then
+      success "Successfully signed in to 1Password"
+      return 0
+    fi
+  fi
+  
+  err "Failed to sign in to 1Password"
+  return 1
+}
+
+# Mobile + Desktop hybrid flow configuration
+configure_1password_mobile_desktop() {
+  info "1Password Mobile + Desktop Flow Configuration..."
+  echo
+  
+  # Step 1: Ensure desktop app is installed
+  echo -e "${BOLD}Step 1: Configure 1Password Desktop${NC}"
+  echo
+  
+  if ! detect_1password_desktop; then
+    warn "1Password desktop is not installed."
+    echo
+    echo "To use the mobile flow, you need to install it first:"
+    echo -e "• Via AUR: ${CYAN}yay -S 1password${NC}"
+    echo -e "• Via Flatpak: ${CYAN}flatpak install com.onepassword.OnePassword${NC}"
+    echo
+    
+    if ask_yes_no "Install automatically via AUR?"; then
+      if install_1password_desktop; then
+        success "1Password desktop installed"
+      else
+        err "Automatic installation failed. Please install manually and try again."
+        return 1
+      fi
+    else
+      err "Please install manually and try again"
+      return 1
+    fi
+  else
+    success "1Password desktop detected"
+  fi
+  
+  # Step 2: Mobile setup instructions
+  echo
+  echo -e "${BOLD}Step 2: Configure on Mobile${NC}"
+  echo
+  echo "On your mobile phone (1Password app):"
+  echo "1. Open 1Password on your phone"
+  echo "2. Tap on the account icon (top right corner)"
+  echo -e "3. Tap on ${BOLD}'Set up another device'${NC}"
+  echo -e "4. Choose ${BOLD}'Scan QR Code'${NC}"
+  echo
+  echo "Press ENTER when ready to continue..."
+  read -r
+  
+  # Step 3: Open desktop app
+  echo
+  echo -e "${BOLD}Step 3: Open 1Password Desktop${NC}"
+  echo
+  
+  if open_1password_desktop; then
+    success "1Password desktop is opening..."
+    sleep 2
+  else
+    info "Please open 1Password desktop manually"
+  fi
+  
+  echo
+  echo "In the 1Password desktop app that opened:"
+  echo -e "1. Click on ${BOLD}'Sign in with QR Code'${NC}"
+  echo "2. A QR code will appear on screen"
+  echo "3. On your phone, point the camera at the QR code"
+  echo "4. Confirm on your phone when prompted"
+  echo
+  echo "Press ENTER when you're done configuring..."
+  read -r
+  
+  # Step 4: Enable CLI integration
+  echo
+  echo -e "${BOLD}Step 4: Enable CLI Integration${NC}"
+  echo
+  echo "Now in 1Password desktop:"
+  echo -e "1. Go to ${BOLD}Settings/Preferences${NC}"
+  echo -e "2. Click on the ${BOLD}Developer${NC} tab"
+  echo -e "3. Enable ${BOLD}'Integrate with 1Password CLI'${NC}"
+  echo "4. Authorize when prompted"
+  echo
+  echo "Press ENTER when finished..."
+  read -r
+  
+  # Test integration
+  echo
+  info "Testing integration..."
+  if timeout 5 op account list >/dev/null 2>&1; then
+    success "Integration working!"
+    
+    # Test login
+    if timeout 3 op vault list >/dev/null 2>&1; then
+      success "Automatic login working!"
+    else
+      info "Signing in via desktop integration..."
+      eval "$(op signin)" || true
+    fi
+    
+    return 0
+  else
+    err "Integration not detected"
+    echo "Please verify you followed all steps"
+    return 1
+  fi
+}
+
+# CLI direct configuration
+configure_1password_cli_direct() {
+  info "Direct CLI Configuration (CLI-only mode)..."
+  echo
+  
+  # Enable CLI-only mode to prevent desktop app from opening
+  export ONEPASSWORD_CLI_ONLY=true
+  export OP_BIOMETRIC_UNLOCK_ENABLED=false
+  export OP_DEVICE=false
+  
+  echo "You need one of the following:"
+  echo -e "• ${BOLD}Emergency Kit${NC} with Setup Code (starts with A3-)"
+  echo -e "• ${BOLD}Account data${NC}: URL, email and Secret Key"
+  echo
+  echo "What do you have?"
+  echo "1) Setup Code from Emergency Kit"
+  echo "2) Complete data (URL, email, Secret Key)"
+  echo "3) I don't have any of these"
+  echo
+  echo -n "Choose (1/2/3): "
+  read -r config_type
+  
+  case "$config_type" in
+    1)
+      echo
+      info "Emergency Kit Setup Code"
+      echo
+      echo -e "${BOLD}How to find in mobile app:${NC}"
+      echo "1. Open 1Password on your phone"
+      echo "2. Tap on account (top)"
+      echo -e "3. Tap on ${BOLD}'Get Setup Code'${NC} or ${BOLD}'Emergency Kit'${NC}"
+      echo "4. Copy the code that starts with A3-"
+      echo
+      echo "Format: ${CYAN}A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX${NC}"
+      echo
+      info "Enter or paste the Setup Code:"
+      
+      # Use pre-configured URL if available
+      if [[ -n "${ONEPASSWORD_URL:-}" ]]; then
+        echo "Using pre-configured URL: ${ONEPASSWORD_URL}"
+        if op account add --address "${ONEPASSWORD_URL}"; then
+          success "Account added via Setup Code!"
+          return 0
+        else
+          err "Failed to add account"
+          return 1
+        fi
+      else
+        if op account add; then
+          success "Account added via Setup Code!"
+          return 0
+        else
+          err "Failed to add account"
+          return 1
+        fi
+      fi
+      ;;
+      
+    2)
+      echo
+      info "Enter account data:"
+      echo
+      
+      # Use URL from .env if available
+      local url="${ONEPASSWORD_URL:-}"
+      if [[ -n "$url" ]]; then
+        info "URL detected from configuration: $url"
+        if ! ask_yes_no "Use this URL?"; then
+          echo -n "Enter URL (e.g. company.1password.com): "
+          read -r url
+        fi
+      else
+        echo -n "Account URL (e.g. company.1password.com): "
+        read -r url
+      fi
+      
+      # Use email from .env if available
+      local email="${ONEPASSWORD_EMAIL:-}"
+      if [[ -n "$email" ]]; then
+        info "Email detected: $email"
+        if ! ask_yes_no "Use this email?"; then
+          echo -n "Enter email: "
+          read -r email
+        fi
+      else
+        echo -n "Email: "
+        read -r email
+      fi
+      
+      echo -n "Secret Key: "
+      read -r secret_key
+      
+      echo
+      info "Adding account..."
+      
+      if op account add --address "$url" --email "$email" --secret-key "$secret_key"; then
+        success "Account added via manual data!"
+        return 0
+      else
+        err "Failed to add account - check your data"
+        return 1
+      fi
+      ;;
+      
+    3)
+      echo
+      warn "You need the Emergency Kit or account data"
+      echo
+      echo "The Emergency Kit contains:"
+      echo "• Setup Code (QR code)"
+      echo "• Secret Key"
+      echo "• Account URL"
+      echo
+      echo "You can find it in:"
+      echo "• Welcome email from 1Password"
+      echo "• PDF downloaded during signup"
+      echo "• Account settings at 1password.com"
+      echo
+      echo "Configure first by running: ./configure.sh"
+      return 1
+      ;;
+  esac
+}
+
+# Main 1Password setup function
+setup_1password_complete() {
+  if [[ "${SETUP_DEV_PGPASS:-false}" != "true" ]]; then
+    info "Skipping 1Password .pgpass configuration (not selected)"
+    return 0
+  fi
+
+  info "Configuring dev environment (.pgpass via 1Password)..."
+  
+  # Install dependencies
+  if ! command_exists jq; then
+    info "Installing jq (required for JSON processing)..."
+    if ! pac jq; then
+      err "Failed to install jq"
+      return 1
+    fi
+  fi
+  
+  # Install 1Password CLI
+  if ! install_1password_cli; then
+    err "1Password CLI required for .pgpass generation"
+    return 1
+  fi
+  
+  # Check current status
+  local status
+  status=$(check_1password_status)
+  
+  case "$status" in
+    "authenticated")
+      info "1Password CLI already configured and authenticated"
+      ;;
+    "configured_not_logged_in")
+      if ! signin_1password_cli; then
+        err "Failed to authenticate with 1Password"
+        return 1
+      fi
+      ;;
+    "not_configured")
+      info "1Password CLI not configured."
+      echo
+      echo "Choose configuration method:"
+      echo -e "1) ${BOLD}Mobile + Desktop Flow${NC} (easiest with phone)"
+      echo "   • Use mobile app to configure desktop"
+      echo "   • Then integrate CLI with desktop"
+      echo -e "2) ${BOLD}Direct CLI${NC} (recommended for scripts)"
+      echo -e "3) ${BOLD}Interactive helper${NC} (all options)"
+      echo -e "4) ${BOLD}Basic manual configuration${NC}"
+      echo
+      echo -n "Choose (1/2/3/4): "
+      read -r config_method
+      
+      case "$config_method" in
+        1)
+          if ! configure_1password_mobile_desktop; then
+            err "Mobile + Desktop configuration failed"
+            return 1
+          fi
+          ;;
+        2)
+          if ! configure_1password_cli_direct; then
+            err "Direct CLI configuration failed"
+            return 1
+          fi
+          # Sign in after configuration
+          if ! signin_1password_cli; then
+            err "Failed to sign in after configuration"
+            return 1
+          fi
+          ;;
+        3)
+          if [[ -x "./1password-helper.sh" ]]; then
+            if ./1password-helper.sh; then
+              success "Helper completed successfully"
+            else
+              err "Helper failed to configure 1Password"
+              return 1
+            fi
+          else
+            err "Helper not found, falling back to basic configuration"
+            if ! op account add; then
+              return 1
+            fi
+          fi
+          ;;
+        4)
+          info "Basic manual configuration..."
+          if ! op account add; then
+            return 1
+          fi
+          if ! signin_1password_cli; then
+            return 1
+          fi
+          ;;
+        *)
+          err "Invalid choice"
+          return 1
+          ;;
+      esac
+      
+      success "1Password configured and authenticated successfully!"
+      ;;
+  esac
+  
+  # Generate .pgpass file
+  return generate_pgpass_file
+}
+
+# Process a database item from 1Password
+process_database_item() {
+  local item_id="$1"
+  local -n entries_ref="$2"
+  
+  info "Processing database item: $item_id"
+  
+  # Get item details
+  local item_json
+  if ! item_json=$(op item get "$item_id" --format=json 2>/dev/null); then
+    warn "Failed to get item details for $item_id"
+    return 1
+  fi
+  
+  # Extract basic info
+  local title hostname port database username password
+  title=$(echo "$item_json" | jq -r '.title // "Unknown"')
+  
+  info "Processing: $title"
+  
+  # Try different field combinations for database credentials
+  local fields
+  fields=$(echo "$item_json" | jq -r '.fields[]? | select(.label) | "\(.label):\(.value // .reference // "")"')
+  
+  # Initialize variables
+  hostname=""
+  port=""
+  database=""
+  username=""
+  password=""
+  
+  # Parse fields with flexible field name matching
+  while IFS=':' read -r label value; do
+    case "${label,,}" in
+      *host*|*server*|*address*)
+        [[ -z "$hostname" ]] && hostname="$value"
+        ;;
+      *port*)
+        [[ -z "$port" ]] && port="$value"
+        ;;
+      *database*|*db*|*schema*)
+        [[ -z "$database" ]] && database="$value"
+        ;;
+      *user*|*login*)
+        [[ -z "$username" ]] && username="$value"
+        ;;
+      *pass*|*pwd*)
+        [[ -z "$password" ]] && password="$value"
+        ;;
+    esac
+  done <<< "$fields"
+  
+  # Try URLs field for connection strings
+  if [[ -z "$hostname" ]]; then
+    local urls
+    urls=$(echo "$item_json" | jq -r '.urls[]? | .href // ""' 2>/dev/null)
+    if [[ -n "$urls" ]]; then
+      # Extract hostname from URL (basic parsing)
+      hostname=$(echo "$urls" | head -1 | sed -E 's|.*://([^:/]+).*|\1|')
+    fi
+  fi
+  
+  # Try username from login info if not found in fields
+  if [[ -z "$username" ]]; then
+    username=$(echo "$item_json" | jq -r '.login.username // ""' 2>/dev/null)
+  fi
+  
+  # Try password from login info if not found in fields
+  if [[ -z "$password" ]]; then
+    password=$(echo "$item_json" | jq -r '.login.password // ""' 2>/dev/null)
+  fi
+  
+  # Set defaults
+  [[ -z "$port" ]] && port="5432"
+  [[ -z "$database" ]] && database="postgres"
+  
+  # Validate required fields
+  if [[ -z "$hostname" ]] || [[ -z "$username" ]] || [[ -z "$password" ]]; then
+    warn "Missing required fields for $title:"
+    warn "  Hostname: ${hostname:-'MISSING'}"
+    warn "  Username: ${username:-'MISSING'}"  
+    warn "  Password: ${password:+'SET'}${password:-'MISSING'}"
+    warn "  Port: $port (default)"
+    warn "  Database: $database (default)"
+    return 1
+  fi
+  
+  # Create .pgpass entry
+  local pgpass_entry="$hostname:$port:$database:$username:$password"
+  entries_ref+=("$pgpass_entry")
+  
+  success "Processed: $hostname:$port:$database:$username"
+  return 0
+}
+
+# Generate .pgpass file from 1Password
+generate_pgpass_file() {
+  local pgpass_file="$HOME/.pgpass"
+  local backup_file=""
+  
+  # Backup existing file
+  if [[ -f "$pgpass_file" ]]; then
+    backup_file="$pgpass_file.backup.$(date +%Y%m%d_%H%M%S)"
+    if backup_file "$pgpass_file" "$backup_file"; then
+      info "Backup created: $backup_file"
+    fi
+  fi
+  
+  # Search for database credentials
+  info "Searching for database credentials in 1Password..."
+  
+  local db_items
+  if ! db_items=$(op item list --categories=database --format=json 2>/dev/null); then
+    err "Failed to list database credentials from 1Password"
+    return 1
+  fi
+  
+  if [[ "$db_items" == "[]" ]] || [[ -z "$db_items" ]]; then
+    warn "No database credentials found in 1Password"
+    info "Make sure you have credentials with category 'Database' in 1Password"
+    return 1
+  fi
+  
+  # Process found credentials
+  local db_count
+  db_count=$(echo "$db_items" | jq length)
+  
+  if [[ "$db_count" -eq 0 ]]; then
+    warn "No database credentials found"
+    return 1
+  fi
+  
+  info "Found $db_count database credential(s)"
+  echo
+  echo "Select credentials to include in .pgpass:"
+  echo
+  
+  # Selection menu
+  local selected_items=()
+  local i=1
+  
+  while IFS= read -r item; do
+    local title
+    title=$(echo "$item" | jq -r '.title')
+    local id
+    id=$(echo "$item" | jq -r '.id')
+    echo "$i) $title"
+    selected_items+=("$id:$title")
+    ((i++))
+  done < <(echo "$db_items" | jq -c '.[]')
+  
+  echo
+  echo "Enter numbers of credentials (space-separated) or 'a' for all:"
+  read -r selection
+  
+  local pgpass_entries=()
+  
+  if [[ "$selection" == "a" || "$selection" == "A" ]]; then
+    # Select all
+    for item in "${selected_items[@]}"; do
+      local item_id="${item%%:*}"
+      if ! process_database_item "$item_id" pgpass_entries; then
+        warn "Failed to process item: ${item##*:}"
+      fi
+    done
+  else
+    # Select specific ones
+    for num in $selection; do
+      if [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge 1 ]] && [[ "$num" -le "${#selected_items[@]}" ]]; then
+        local item="${selected_items[$((num-1))]}"
+        local item_id="${item%%:*}"
+        if ! process_database_item "$item_id" pgpass_entries; then
+          warn "Failed to process item: ${item##*:}"
+        fi
+      fi
+    done
+  fi
+  
+  # Generate .pgpass file
+  if [[ ${#pgpass_entries[@]} -gt 0 ]]; then
+    {
+      echo "# .pgpass generated automatically via 1Password"
+      echo "# Format: hostname:port:database:username:password"
+      echo "# Generated on: $(date)"
+      echo
+      for entry in "${pgpass_entries[@]}"; do
+        echo "$entry"
+      done
+    } > "$pgpass_file"
+    
+    chmod 600 "$pgpass_file"
+    
+    success "Created .pgpass file with ${#pgpass_entries[@]} entry(s)"
+    info "Location: $pgpass_file"
+    if [[ -n "$backup_file" ]]; then
+      info "Previous backup: $backup_file"
+    fi
+    
+    return 0
+  else
+    err "No valid entries processed"
+    return 1
+  fi
+}
+
+# Test mode with debug output
+test_1password_mode() {
+  # Ensure test mode enables the 1Password module
+  SETUP_DEV_PGPASS=true
+  
+  while true; do
+    echo
+    echo -e "${CYAN}╔═══════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║  ${BOLD}1Password .pgpass Configuration Test${NC}${CYAN} ║${NC}"
+    echo -e "${CYAN}╚═══════════════════════════════════════╗${NC}"
+    echo
+    
+    echo "Test mode options:"
+    echo "1) Execute normal test"
+    echo "2) Reset 1Password (remove accounts and test from scratch)"
+    echo "3) Exit"
+    echo
+    echo -n "Choose (1/2/3): "
+    
+    # Use timeout to prevent infinite loops
+    if ! read -r -t 30 test_option; then
+      echo
+      warn "Input timeout or no response, exiting test mode"
+      return 0
+    fi
+    
+    case "$test_option" in
+    1)
+      echo "Executing normal test..."
+      echo
+      if setup_1password_complete; then
+        # Create debug file
+        local debug_file="$HOME/.pgpass_debug"
+        if [[ -f "$HOME/.pgpass" ]]; then
+          {
+            echo "# .pgpass_debug generated automatically via 1Password (TEST MODE)"
+            echo "# Original file: $HOME/.pgpass"
+            echo "# Generated on: $(date)"
+            echo "# Command: ./install.sh --1pass"
+            echo "#"
+            echo "# Format: hostname:port:database:username:password"
+            echo
+            cat "$HOME/.pgpass"
+          } > "$debug_file"
+          
+          success "Debug file created!"
+          info "Original: $HOME/.pgpass"
+          info "Debug: $debug_file"
+          
+          echo
+          info "Contents of $debug_file:"
+          cat "$debug_file"
+        fi
+        
+        echo
+        success "Test mode completed successfully!"
+        echo
+        echo -e "${BOLD}Generated files:${NC}"
+        [[ -f "$HOME/.pgpass" ]] && echo "  • $HOME/.pgpass (main file)"
+        [[ -f "$HOME/.pgpass_debug" ]] && echo "  • $HOME/.pgpass_debug (test version)"
+        
+        return 0
+      else
+        err "Test configuration failed"
+        return 1
+      fi
+      ;;
+    2)
+      echo "Resetting 1Password for clean test..."
+      
+      # Sign out CLI and remove accounts (with timeout to avoid hanging)
+      info "Signing out from CLI..."
+      timeout 5 op signout --all >/dev/null 2>&1 || true
+      
+      # Remove CLI config files
+      if [[ -d "$HOME/.config/op" ]]; then
+        info "Removing 1Password CLI configuration..."
+        rm -rf "$HOME/.config/op" 2>/dev/null || true
+      fi
+      
+      # Clear desktop app integration
+      info "Clearing desktop app integration..."
+      
+      # Try to quit desktop app gracefully
+      if command_exists 1password; then
+        pkill -f "1password" 2>/dev/null || true
+      fi
+      
+      # Remove desktop app data that might interfere with CLI
+      local desktop_data_dirs=(
+        "$HOME/.config/1Password"
+        "$HOME/.local/share/1Password"
+        "$HOME/.cache/1Password"
+      )
+      
+      for dir in "${desktop_data_dirs[@]}"; do
+        if [[ -d "$dir" ]]; then
+          info "Removing desktop app data: $(basename "$dir")"
+          rm -rf "$dir" 2>/dev/null || true
+        fi
+      done
+      
+      # Clear any temporary authentication tokens
+      unset OP_SESSION_* 2>/dev/null || true
+      
+      success "Reset completed! Both CLI and desktop app cleared."
+      info "Note: You may need to sign in again to the desktop app if you use it"
+      echo
+      
+      # After successful reset, continue to show menu again
+      continue
+      ;;
+    3)
+      info "Exiting test mode"
+      return 0
+      ;;
+    "")
+      # Empty input - continue loop
+      warn "Please enter a valid option (1, 2, or 3)"
+      continue
+      ;;
+    *)
+      warn "Invalid option: '$test_option'. Please choose 1, 2, or 3"
+      continue
+      ;;
+    esac
+  done
+}
+
+# Export functions for use by main script
+export -f install_1password_cli detect_1password_desktop install_1password_desktop
+export -f open_1password_desktop check_1password_status signin_1password_cli
+export -f configure_1password_mobile_desktop configure_1password_cli_direct
+export -f setup_1password_complete process_database_item generate_pgpass_file
+export -f test_1password_mode
