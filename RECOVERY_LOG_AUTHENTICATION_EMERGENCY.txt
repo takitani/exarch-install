@@ -1,0 +1,197 @@
+EMERGENCY AUTHENTICATION RECOVERY LOG
+=====================================
+Date: 2025-08-30
+Issue: Authentication system compromised after Himmelblau implementation
+
+PROBLEM DESCRIPTION:
+==================
+- Claude Code was implementing Himmelblau (https://github.com/himmelblau-idm/himmelblau) 
+- Himmelblau provides REAL Microsoft Entra ID authentication for Linux systems
+- After implementation, system authentication broke:
+  * Lock screen stopped accepting local password
+  * Ctrl+Alt+F2 terminal login also failed
+  * System now logs in automatically without password prompt
+  * This indicates PAM/authentication configuration is severely broken
+
+DANGEROUS MODIFICATIONS MADE:
+============================
+Based on the entra-id.sh module, these critical changes were likely made:
+
+1. PAM CONFIGURATION CHANGES:
+   - Modified /etc/pam.d/login 
+   - Modified /etc/pam.d/gdm-password (if using GDM)
+   - Modified /etc/pam.d/sddm (if using SDDM)
+   - Added pam_himmelblau.so modules
+   - Lines added to various PAM files
+
+2. NSS CONFIGURATION CHANGES:
+   - Modified /etc/nsswitch.conf
+   - Changed passwd/group/shadow lookups to include "himmelblau"
+   - Original: passwd: files systemd
+   - Changed to: passwd: files himmelblau systemd
+
+3. DISPLAY MANAGER CONFIGURATION:
+   - Modified /etc/gdm/custom.conf or /etc/sddm.conf
+   - Disabled autologin settings
+   - May have broken normal authentication flow
+
+4. SYSTEMD SERVICES:
+   - Started/enabled himmelblaud daemon
+   - May be interfering with normal authentication
+
+FILES THAT WERE LIKELY MODIFIED:
+===============================
+- /etc/pam.d/login
+- /etc/pam.d/gdm-password  
+- /etc/pam.d/sddm
+- /etc/pam.d/system-auth
+- /etc/nsswitch.conf
+- /etc/gdm/custom.conf
+- /etc/sddm.conf
+- /etc/himmelblau/himmelblau.conf (new file)
+
+BACKUP FILES TO LOOK FOR:
+========================
+The script should have created backups with timestamps:
+- /etc/pam.d/*.backup.YYYYMMDD_HHMMSS
+- /etc/nsswitch.conf.backup.YYYYMMDD_HHMMSS  
+- /etc/gdm/custom.conf.backup.YYYYMMDD_HHMMSS
+- /etc/sddm.conf.backup.YYYYMMDD_HHMMSS
+
+EMERGENCY RECOVERY STEPS:
+========================
+
+STEP 1: BOOT INTO RECOVERY MODE
+-------------------------------
+1. Reboot system
+2. At GRUB menu, press 'e' to edit boot entry
+3. Add 'single' or 'init=/bin/bash' to kernel line
+4. Press Ctrl+X to boot
+
+STEP 2: RESTORE AUTHENTICATION (AS ROOT)
+-----------------------------------------
+# Mount filesystem as writable
+mount -o remount,rw /
+
+# Stop potentially interfering services
+systemctl stop himmelblaud 2>/dev/null
+systemctl stop gdm 2>/dev/null
+systemctl stop sddm 2>/dev/null
+
+# Find and restore backup files
+find /etc -name "*.backup.*" -type f 2>/dev/null
+
+# Restore critical files (replace TIMESTAMP with actual timestamp):
+cp /etc/pam.d/login.backup.TIMESTAMP /etc/pam.d/login
+cp /etc/pam.d/gdm-password.backup.TIMESTAMP /etc/pam.d/gdm-password  
+cp /etc/pam.d/system-auth.backup.TIMESTAMP /etc/pam.d/system-auth
+cp /etc/nsswitch.conf.backup.TIMESTAMP /etc/nsswitch.conf
+cp /etc/gdm/custom.conf.backup.TIMESTAMP /etc/gdm/custom.conf
+
+# Remove himmelblau configurations
+rm -rf /etc/himmelblau/
+systemctl disable himmelblaud 2>/dev/null
+
+# Restart authentication services
+systemctl restart gdm  # or sddm
+
+STEP 3: ALTERNATIVE - RESET TO DEFAULTS
+---------------------------------------
+If no backups exist, restore default configurations:
+
+# Default nsswitch.conf
+cat > /etc/nsswitch.conf << 'EOF'
+passwd: files systemd
+group: files systemd  
+shadow: files
+gshadow: files
+hosts: mymachines resolve [!UNAVAIL=return] files myhostname dns
+networks: files
+protocols: db files
+services: db files
+ethers: db files
+rpc: db files
+netgroup: nis
+EOF
+
+# Reset PAM login (basic working config)
+cat > /etc/pam.d/login << 'EOF'
+#%PAM-1.0
+auth       required   pam_securetty.so
+auth       requisite  pam_nologin.so
+auth       required   pam_unix.so nullok
+account    required   pam_unix.so
+password   required   pam_unix.so nullok sha512 shadow
+session    required   pam_unix.so
+session    required   pam_env.so readenv=1
+session    required   pam_env.so readenv=1 envfile=/etc/environment
+session    optional   pam_systemd.so
+EOF
+
+STEP 4: VERIFY RECOVERY
+----------------------
+# Test local user authentication
+passwd opik  # Reset your password if needed
+
+# Reboot and test
+reboot
+
+PREVENTION FOR NEXT TIME:
+========================
+1. ALWAYS test authentication changes on a VM first
+2. Create comprehensive backups before authentication changes
+3. Test with a second terminal session open as root
+4. Implement authentication changes incrementally, not all at once
+5. Have a live USB/recovery disk ready
+
+WHAT HIMMELBLAU DOES:
+====================
+Himmelblau is a legitimate project that provides:
+- Real Microsoft Entra ID authentication for Linux
+- Integration with Azure AD for enterprise environments  
+- PAM and NSS modules for system-wide authentication
+- But it's complex and can break existing authentication if not configured carefully
+
+TO CONTINUE HIMMELBLAU IMPLEMENTATION SAFELY:
+============================================
+1. First fully restore normal authentication
+2. Test the implementation on a VM or test system first
+3. Make incremental changes with testing between each step
+4. Keep multiple terminal sessions open during configuration
+5. Have proper backups and recovery plan
+
+EMERGENCY CONTACTS:
+==================
+If you cannot recover:
+1. Boot from Arch Linux live USB
+2. Mount your root filesystem  
+3. Chroot into your system
+4. Restore the backup files
+5. Or worst case: recreate user accounts from live environment
+
+CURRENT REPOSITORY STATE:
+========================
+Files modified in git:
+- install.sh (modified)
+- lib/config-manager.sh (modified) 
+- lib/core.sh (modified)
+- modules/azure-ad.sh (added)
+- modules/entra-id.sh (added - contains the problematic code)
+- config/azure-ad.conf (added)
+- config/entra-id.conf (untracked)
+- helpers/azure-ad-test.sh (added)
+- helpers/entra-id-test.sh (untracked)
+
+The entra-id.sh module contains the dangerous authentication modification code
+that likely broke your system.
+
+LESSON LEARNED:
+===============
+Never modify system authentication (PAM/NSS) without:
+1. Multiple backup terminal sessions as root
+2. Complete system backup
+3. Testing on non-production system first  
+4. Understanding exactly what each change does
+5. Having verified recovery procedures
+
+This log should help you recover and safely continue development.

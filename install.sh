@@ -15,12 +15,14 @@ source "$SCRIPT_DIR/lib/hardware-detection.sh"
 source "$SCRIPT_DIR/config/settings.conf"
 source "$SCRIPT_DIR/config/packages.conf"
 source "$SCRIPT_DIR/config/profiles.conf"
+source "$SCRIPT_DIR/config/entra-id.conf"
 
 # Source modules
 source "$SCRIPT_DIR/modules/1password.sh"
 source "$SCRIPT_DIR/modules/development.sh"
 source "$SCRIPT_DIR/modules/dell-xps.sh"
 source "$SCRIPT_DIR/modules/remmina.sh"
+source "$SCRIPT_DIR/modules/entra-id.sh"
 
 # ======================================
 # MENU SYSTEM
@@ -92,7 +94,8 @@ show_menu() {
     "INSTALL_AGE:Age encryption" \
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
     "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
-    "SETUP_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
+    "SETUP_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password" \
+    "SETUP_ENTRA_ID:Connect to Microsoft Entra ID/Microsoft SSO (optional)"
   
   echo
   show_menu_controls
@@ -151,6 +154,10 @@ show_menu_controls() {
   
   if is_remmina_test_mode; then
     echo -e "  ${CYAN}REMMINA DEBUG MODE${NC}"
+  fi
+  
+  if is_entra_test_mode; then
+    echo -e "  ${CYAN}MICROSOFT ENTRA ID TEST MODE${NC}"
   fi
 }
 
@@ -322,6 +329,11 @@ execute_installation_modules() {
     setup_remmina_connections_complete
   fi
   
+  # Microsoft Entra ID integration
+  if module_enabled "entra-id"; then
+    setup_entra_id_complete
+  fi
+  
   # Dell XPS optimizations
   if module_enabled "dell-xps"; then
     setup_dell_xps_9320_complete
@@ -382,6 +394,9 @@ module_enabled() {
       ;;
     "remmina")
       [[ "${ENABLE_REMMINA_MODULE:-true}" == "true" ]] && [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]
+      ;;
+    "entra-id")
+      [[ "${ENABLE_ENTRA_MODULE:-true}" == "true" ]] && [[ "${SETUP_ENTRA_ID:-false}" == "true" ]]
       ;;
     "dell-xps") 
       [[ "${ENABLE_DELL_XPS_MODULE:-true}" == "true" ]] && [[ "${SETUP_DELL_XPS_9320:-false}" == "true" ]]
@@ -520,6 +535,11 @@ main() {
   
   if is_remmina_test_mode; then
     test_remmina_mode
+    exit $?
+  fi
+  
+  if is_entra_test_mode; then
+    bash "$SCRIPT_DIR/helpers/entra-id-test.sh"
     exit $?
   fi
   

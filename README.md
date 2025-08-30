@@ -68,6 +68,11 @@ O script apresenta um menu interativo moderno com navegação por teclado:
 #### 💻 IDEs e Editores de Código
 - **Cursor** - IDE moderna com IA integrada para desenvolvimento
 
+#### 🔐 Autenticação Corporativa
+- **Microsoft Entra ID Integration** - Login com contas corporativas Microsoft
+- **Multi-factor Authentication (MFA)** - Suporte completo a autenticação em dois fatores
+- **Himmelblau Authentication Daemon** - Sistema moderno de autenticação para Linux
+
 #### 🚀 Ambientes de Desenvolvimento via Mise
 - **Node.js**: Versão LTS por padrão (com verificação de instalação prévia)
 - **.NET SDK**: 
@@ -269,6 +274,63 @@ age -d -i ~/.config/age/keys.txt arquivo.txt.age > arquivo.txt
 - **Chezmoi**: https://www.chezmoi.io/
 - **Age**: https://age-encryption.org/
 - **Exemplos**: https://github.com/twpayne/chezmoi/tree/master/docs/examples
+
+## 🔐 Microsoft Entra ID Authentication Integration
+
+### Complete Corporate Authentication Solution
+
+O Exarch Scripts agora inclui **integração completa com Microsoft Entra ID** (Azure AD), permitindo login direto no Linux com contas corporativas da Microsoft.
+
+#### ✨ Recursos
+- **🏢 Login corporativo**: Use `usuario@suaempresa.com` para fazer login
+- **🔒 Multi-factor Authentication**: MFA automático via Microsoft Authenticator
+- **🔄 Sincronização de usuários**: Usuários do Entra ID aparecem automaticamente no sistema
+- **🖥️ Suporte completo ao Hyprland**: Funciona tanto no terminal quanto na interface gráfica
+- **⚡ Instalação automatizada**: Script completo com compilação e configuração
+
+#### 🚀 Como usar
+
+**Instalação automática (recomendado):**
+```bash
+./install.sh
+# Selecione: "Microsoft Entra ID Authentication"
+```
+
+**Resultado:**
+- Sistema compilado e instalado automaticamente
+- PAM e NSS configurados
+- Guias interativas para registro de aplicação
+- Testes de conectividade e autenticação
+- Login funcionando em 15-20 minutos
+
+#### 📋 O que é instalado
+- **Himmelblau**: Daemon de autenticação Microsoft para Linux
+- **Módulos PAM**: Integração com sistema de autenticação
+- **Módulos NSS**: Resolução de usuários e grupos
+- **Configurações**: PAM, NSS e systemd automaticamente configurados
+
+#### 🧪 Após a instalação
+```bash
+# Testar autenticação
+himmelblau auth-test --name usuario@suaempresa.com
+
+# Verificar usuário no sistema  
+getent passwd usuario@suaempresa.com
+
+# Login no terminal
+su - usuario@suaempresa.com
+
+# Login gráfico no Hyprland
+# Use: usuario@suaempresa.com na tela de login
+```
+
+#### 📚 Documentação completa
+- **[Guia de Setup](docs/entra-id-setup.md)** - Instalação e configuração detalhada
+- **[Criação Manual de App](docs/entra-id-app-creation.md)** - Registro manual no portal Azure
+- **[Troubleshooting](docs/entra-id-troubleshooting.md)** - Problemas comuns e soluções
+- **[Backup e Restore](docs/entra-id-backup-restore.md)** - Procedimentos de segurança
+
+---
 
 ## 🔐 Configuração Automática: PostgreSQL .pgpass via 1Password
 

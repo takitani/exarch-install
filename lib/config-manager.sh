@@ -37,6 +37,8 @@ DEFAULT_SETUP_DOTFILES_MANAGEMENT=false
 DEFAULT_SETUP_DEV_PGPASS=false
 DEFAULT_SETUP_REMMINA_CONNECTIONS=false
 DEFAULT_ENABLE_REMMINA_MODULE=true
+DEFAULT_SETUP_ENTRA_ID=false
+DEFAULT_ENABLE_ENTRA_MODULE=true
 
 # Runtime defaults
 DEFAULT_NODE="lts"
@@ -104,6 +106,8 @@ init_config_variables() {
   SETUP_DEV_PGPASS=${SETUP_DEV_PGPASS:-$DEFAULT_SETUP_DEV_PGPASS}
   SETUP_REMMINA_CONNECTIONS=${SETUP_REMMINA_CONNECTIONS:-$DEFAULT_SETUP_REMMINA_CONNECTIONS}
   ENABLE_REMMINA_MODULE=${ENABLE_REMMINA_MODULE:-$DEFAULT_ENABLE_REMMINA_MODULE}
+  SETUP_ENTRA_ID=${SETUP_ENTRA_ID:-$DEFAULT_SETUP_ENTRA_ID}
+  ENABLE_ENTRA_MODULE=${ENABLE_ENTRA_MODULE:-$DEFAULT_ENABLE_ENTRA_MODULE}
   
   # Runtime versions
   DEFAULT_NODE=${DEFAULT_NODE:-$DEFAULT_NODE}
@@ -132,7 +136,8 @@ validate_config() {
   fi
   
   # Check directory paths exist for source directories (if sync is enabled)
-  if [[ "$SYNC_HYPR_CONFIGS" == true ]]; then
+  # Skip this check in test modes
+  if [[ "$SYNC_HYPR_CONFIGS" == true ]] && [[ "${TEST_1PASS_MODE:-false}" == false ]] && [[ "${TEST_REMMINA_MODE:-false}" == false ]] && [[ "${TEST_ENTRA_MODE:-false}" == false ]]; then
     if [[ ! -d "$HYPR_SRC_DIR" ]]; then
       warn "Hypr source directory not found: $HYPR_SRC_DIR (will skip sync)"
       SYNC_HYPR_CONFIGS=false
@@ -161,6 +166,7 @@ parse_command_line() {
   FORCE_XPS=false
   TEST_1PASS_MODE=false
   TEST_REMMINA_MODE=false
+  TEST_ENTRA_MODE=false
   
   for arg in "$@"; do
     case "$arg" in
@@ -179,6 +185,10 @@ parse_command_line() {
       --remmina)
         TEST_REMMINA_MODE=true
         info "🖥️ REMMINA DEBUG MODE - Testing RDP connection generation"
+        ;;
+      --entra-id)
+        TEST_ENTRA_MODE=true
+        info "🔐 MICROSOFT ENTRA ID TEST MODE - Testing Microsoft Entra ID integration"
         ;;
       --help|-h)
         show_help
@@ -207,6 +217,7 @@ show_help() {
   echo "  --xps       Force Dell XPS 13 Plus mode"
   echo "  --1pass     Test 1Password .pgpass configuration only"
   echo "  --remmina   Test Remmina RDP connection generation (creates sample files)"
+  echo "  --entra-id  Test Microsoft Entra ID integration (diagnostic tools)"
   echo "  --help, -h  Show this help message"
   echo
   echo "Configuration:"
@@ -262,6 +273,8 @@ SETUP_DOTFILES_MANAGEMENT=$SETUP_DOTFILES_MANAGEMENT
 SETUP_DEV_PGPASS=$SETUP_DEV_PGPASS
 SETUP_REMMINA_CONNECTIONS=$SETUP_REMMINA_CONNECTIONS
 ENABLE_REMMINA_MODULE=$ENABLE_REMMINA_MODULE
+SETUP_ENTRA_ID=$SETUP_ENTRA_ID
+ENABLE_ENTRA_MODULE=$ENABLE_ENTRA_MODULE
 
 # Runtime versions
 DEFAULT_NODE="$DEFAULT_NODE"

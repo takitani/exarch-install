@@ -1,0 +1,40 @@
+══════════════════════════════════════════════════════════════════════
+COPIE E COLE ESTE COMANDO ÚNICO NO SEU TERMINAL:
+══════════════════════════════════════════════════════════════════════
+
+cd /home/opik/Devel/exarch-scripts && ./finalize-himmelblau.sh
+
+══════════════════════════════════════════════════════════════════════
+OU SE PREFERIR, PASSO A PASSO:
+══════════════════════════════════════════════════════════════════════
+
+# 1. Vá para o diretório
+cd /home/opik/Devel/exarch-scripts
+
+# 2. Execute o script de finalização (vai pedir sudo)
+./finalize-himmelblau.sh
+
+# 3. Digite sua senha quando pedir
+
+# 4. Siga as instruções na tela para fazer o domain join
+
+══════════════════════════════════════════════════════════════════════
+O QUE O SCRIPT FAZ:
+══════════════════════════════════════════════════════════════════════
+
+✅ Instala os binários do Himmelblau já compilados
+✅ Configura PAM e NSS para autenticação
+✅ Cria a configuração com seu Tenant ID
+✅ Inicia o serviço himmelblaud
+✅ Pergunta se quer fazer o domain join
+✅ Guia você pelo processo de login Microsoft
+
+══════════════════════════════════════════════════════════════════════
+DEPOIS DO DOMAIN JOIN VOCÊ PODERÁ:
+══════════════════════════════════════════════════════════════════════
+
+• Fazer login com: usuario@exato.digital
+• Usar senha Microsoft no sistema
+• Acessar com conta corporativa
+
+══════════════════════════════════════════════════════════════════════

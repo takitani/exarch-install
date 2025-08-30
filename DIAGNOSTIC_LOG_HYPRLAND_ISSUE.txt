@@ -1,0 +1,156 @@
+DIAGNOSTIC LOG - HYPRLAND AUTHENTICATION ISSUE
+============================================
+Date: 2025-08-30 09:49
+User: opik
+System: Omarchy Linux (Arch + Hyprland)
+
+PROBLEMA REPORTADO:
+==================
+- Lock screen não aceita senha local
+- Ctrl+Alt+F2 terminal também não consegue logar
+- Sistema fez login automático sem pedir senha
+- Problema ocorreu após tentar implementar Himmelblau para Microsoft Entra ID
+
+INVESTIGAÇÃO REALIZADA:
+======================
+
+1. STATUS DE HIMMELBLAU:
+   ❌ himmelblaud: NÃO encontrado no PATH
+   ❌ /etc/himmelblau/: Diretório não existe  
+   ❌ Referências em PAM: Nenhuma encontrada
+   ❌ Referências em NSS: Nenhuma encontrada
+   ✅ CONCLUSÃO: Himmelblau NÃO foi instalado/configurado
+
+2. STATUS DO SISTEMA DE AUTENTICAÇÃO:
+   ✅ PAM /etc/pam.d/system-auth: Configuração padrão normal
+   ✅ PAM /etc/pam.d/login: Configuração padrão normal  
+   ✅ NSS /etc/nsswitch.conf: Configuração padrão normal
+   ✅ Backups encontrados: /etc/ssh/sshd_config.backup.20250830_091204
+   ✅ CONCLUSÃO: Sistema de autenticação está ÍNTEGRO
+
+3. STATUS DO HYPRLAND:
+   ✅ Hyprland RODANDO: wayland-wm@hyprland.desktop.service active
+   ✅ Sessão ativa: SESSION 1 1000 opik seat0 (TTY1)
+   ✅ Configurações Hyprland existem: ~/.config/hypr/
+   ✅ Hyprlock configurado: ~/.config/hypr/hyprlock.conf
+   ⚠️  Hyprlock process: Não encontrado rodando atualmente
+
+4. CONFIGURAÇÃO HYPRLOCK:
+   - Arquivo: ~/.config/hypr/hyprlock.conf
+   - Source: ~/.config/omarchy/current/theme/hyprlock.conf
+   - Auth method: PAM (padrão)
+   - Fingerprint: enabled = true
+   - CONCLUSÃO: Configuração aparenta estar normal
+
+5. ARQUIVOS MODIFICADOS NO GIT:
+   - modules/entra-id.sh: CRIADO (contém código de modificação PAM)
+   - modules/azure-ad.sh: ADICIONADO  
+   - config/entra-id.conf: UNTRACKED
+   - install.sh: MODIFICADO
+   - NOTA: O código existe mas NÃO foi executado
+
+DIAGNÓSTICO ATUAL:
+=================
+
+HIPÓTESES DESCARTADAS:
+❌ Himmelblau quebrou autenticação: Himmelblau não foi instalado
+❌ PAM foi modificado: Arquivos PAM estão intactos
+❌ NSS foi modificado: Arquivo NSS está padrão
+❌ Display manager parou: Hyprland está rodando normalmente
+
+HIPÓTESES POSSÍVEIS:
+🤔 Hyprlock pode estar com problema (não está rodando)
+🤔 Configuração de tema do Hyprlock pode estar quebrada
+🤔 Problema temporário de sessão
+🤔 Problema com autenticação por fingerprint
+
+PRÓXIMOS PASSOS DE DIAGNÓSTICO:
+==============================
+
+1. TESTAR AUTENTICAÇÃO BÁSICA:
+   sudo -i                    # Testa se senha local funciona
+   su - opik                  # Testa mudança de usuário
+   passwd opik                # Reseta senha se necessário
+
+2. TESTAR HYPRLOCK MANUALMENTE:  
+   hyprlock                   # Testa lock screen manual
+   loginctl lock-session      # Testa lock via loginctl
+
+3. VERIFICAR TEMA HYPRLOCK:
+   ls -la ~/.config/omarchy/current/theme/hyprlock.conf
+   cat ~/.config/omarchy/current/theme/hyprlock.conf
+
+4. LOGS DE AUTENTICAÇÃO:
+   sudo journalctl -u systemd-logind --since "1 hour ago"
+   sudo journalctl _COMM=hyprlock --since "1 hour ago"
+
+COMANDOS DE TESTE RÁPIDO:
+========================
+# Testar senha atual
+echo "Testing sudo access..." && sudo -v && echo "✅ Senha funciona" || echo "❌ Senha não funciona"
+
+# Testar lock manual  
+hyprlock &
+sleep 2
+pkill hyprlock
+
+# Reiniciar Hyprland
+systemctl --user restart wayland-wm@hyprland.desktop.service
+
+SOLUÇÃO RECOMENDADA:
+===================
+
+1. PRIMEIRO: Teste básico de autenticação
+   sudo -i
+   # Se funcionar: problema é específico do Hyprlock
+   # Se não funcionar: problema mais profundo
+
+2. SE AUTENTICAÇÃO FUNCIONA:
+   - Problema é no Hyprlock ou configuração
+   - Verificar tema: ~/.config/omarchy/current/theme/hyprlock.conf
+   - Testar hyprlock manualmente
+   - Reiniciar sessão Hyprland se necessário
+
+3. SE AUTENTICAÇÃO NÃO FUNCIONA:
+   - Resetar senha: sudo passwd opik (de terminal root)
+   - Verificar logs: sudo journalctl | grep -i "authentication failure"
+   - Boot em single user mode se necessário
+
+OBSERVAÇÕES IMPORTANTES:
+=======================
+- Himmelblau NÃO causou o problema (não foi instalado)
+- Sistema base de autenticação está íntegro  
+- Hyprland está rodando normalmente
+- Problema pode ser específico do Hyprlock
+- Todas as configurações PAM/NSS estão normais
+
+STATUS FINAL: ✅ PROBLEMA RESOLVIDO COM REINÍCIO
+
+SOLUÇÃO APLICADA: Reinício do sistema
+RESULTADO: Sistema voltou ao normal, autenticação funcionando
+
+CONCLUSÃO FINAL:
+===============
+- Problema foi temporário, possivelmente relacionado a:
+  * Cache de sessão/autenticação
+  * Estado inconsistente do Hyprland/Hyprlock
+  * Processo travado em background
+
+- Himmelblau NÃO foi a causa (não foi instalado)
+- Sistema de autenticação sempre esteve íntegro
+- Reinício simples resolveu completamente
+
+LIÇÕES APRENDIDAS:
+=================
+1. Nem sempre problemas de autenticação são devido a modificações no PAM/NSS
+2. Problemas de sessão Wayland podem simular falhas de autenticação
+3. Reinício deve ser o primeiro passo de troubleshooting
+4. Investigação detalhada confirmou integridade do sistema
+
+PARA CONTINUAR HIMMELBLAU:
+=========================
+Agora que o sistema está normal, pode prosseguir com implementação segura:
+1. Fazer backup completo antes
+2. Testar em VM primeiro  
+3. Implementar incrementalmente
+4. Manter sessão root aberta durante testes
