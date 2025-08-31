@@ -33,6 +33,9 @@ SELECTED_INDEX=0
 show_menu() {
   clear
   
+  # Reset menu counter
+  MENU_ITEM_COUNTER=0
+  
   # Header
   echo -e "${EXATO_CYAN}╔════════════════════════════════════════╗${NC}"
   echo -e "${EXATO_CYAN}║${NC}  ${BOLD}Exarch Scripts - Setup Menu${NC}           ${EXATO_CYAN}║${NC}"
@@ -98,6 +101,9 @@ show_menu() {
   show_menu_controls
 }
 
+# Global counter for menu items
+MENU_ITEM_COUNTER=0
+
 # Show a menu category with options
 show_menu_category() {
   local category_name="$1"
@@ -114,7 +120,8 @@ show_menu_category() {
     
     [[ "$value" == "true" ]] && status="✓"
     
-    echo "  $status $display_name"
+    printf "  ${BOLD}%2d${NC}. %s %s\n" "$MENU_ITEM_COUNTER" "$status" "$display_name"
+    ((MENU_ITEM_COUNTER++))
   done
   
   echo
