@@ -137,8 +137,8 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}↑/↓${NC} Navigate   ${CYAN}Space${NC} Toggle   ${CYAN}Enter${NC} Install"
-  echo -e "  ${CYAN}a${NC} All   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal"
+  echo -e "  ${CYAN}0-30${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}a${NC} All   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
   if is_debug_mode; then
@@ -157,6 +157,18 @@ show_menu_controls() {
 
 # Interactive menu loop
 interactive_menu() {
+  # Auto-detect Dell XPS on first run
+  local hw_info
+  hw_info=$(get_system_info 2>/dev/null || echo "Unknown")
+  
+  if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
+    echo -e "${YELLOW}🔍 Dell XPS detected - auto-enabling hardware optimizations...${NC}"
+    SETUP_DELL_XPS_9320=true
+    SETUP_DUAL_KEYBOARD=true
+    echo -e "${GREEN}✓ XPS optimizations enabled${NC}"
+    sleep 2
+  fi
+  
   while true; do
     show_menu
     
@@ -204,6 +216,193 @@ interactive_menu() {
         ;;
     esac
   done
+}
+
+# Apply configuration profile
+apply_profile() {
+  local profile="$1"
+  
+  case "$profile" in
+    "all")
+      # Select all options
+      INSTALL_GOOGLE_CHROME=true
+      INSTALL_FIREFOX=true
+      INSTALL_COPYQ=true
+      INSTALL_DROPBOX=true
+      INSTALL_AWS_VPN=true
+      INSTALL_POSTMAN=true
+      INSTALL_REMMINA=true
+      INSTALL_ESPANSO=true
+      INSTALL_NANO=true
+      INSTALL_MICRO=true
+      INSTALL_KATE=true
+      INSTALL_SLACK=true
+      INSTALL_TEAMS=true
+      INSTALL_JB_TOOLBOX=true
+      INSTALL_JB_RIDER=true
+      INSTALL_JB_DATAGRIP=true
+      INSTALL_CURSOR=true
+      INSTALL_VSCODE=true
+      INSTALL_WINDSURF=true
+      INSTALL_MISE_RUNTIMES=true
+      INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=true
+      INSTALL_GEMINI_CLI=true
+      SYNC_HYPR_CONFIGS=true
+      INSTALL_CHEZMOI=true
+      INSTALL_AGE=true
+      SETUP_DOTFILES_MANAGEMENT=true
+      SETUP_DEV_PGPASS=true
+      SETUP_DELL_XPS_9320=true
+      SETUP_DUAL_KEYBOARD=true
+      GENERATE_REMMINA_CONNECTIONS=true
+      ;;
+    "recommended")
+      # Reset all first
+      INSTALL_GOOGLE_CHROME=true
+      INSTALL_FIREFOX=false
+      INSTALL_COPYQ=true
+      INSTALL_DROPBOX=true
+      INSTALL_AWS_VPN=false
+      INSTALL_POSTMAN=false
+      INSTALL_REMMINA=false
+      INSTALL_ESPANSO=false
+      INSTALL_NANO=true
+      INSTALL_MICRO=false
+      INSTALL_KATE=false
+      INSTALL_SLACK=false
+      INSTALL_TEAMS=false
+      INSTALL_JB_TOOLBOX=false
+      INSTALL_JB_RIDER=false
+      INSTALL_JB_DATAGRIP=false
+      INSTALL_CURSOR=false
+      INSTALL_VSCODE=true
+      INSTALL_WINDSURF=false
+      INSTALL_MISE_RUNTIMES=true
+      INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=false
+      INSTALL_GEMINI_CLI=false
+      SYNC_HYPR_CONFIGS=true
+      INSTALL_CHEZMOI=false
+      INSTALL_AGE=false
+      SETUP_DOTFILES_MANAGEMENT=false
+      SETUP_DEV_PGPASS=false
+      SETUP_DELL_XPS_9320=false
+      SETUP_DUAL_KEYBOARD=false
+      GENERATE_REMMINA_CONNECTIONS=false
+      ;;
+    "development")
+      INSTALL_GOOGLE_CHROME=true
+      INSTALL_FIREFOX=true
+      INSTALL_COPYQ=true
+      INSTALL_DROPBOX=true
+      INSTALL_AWS_VPN=true
+      INSTALL_POSTMAN=true
+      INSTALL_REMMINA=true
+      INSTALL_ESPANSO=false
+      INSTALL_NANO=true
+      INSTALL_MICRO=true
+      INSTALL_KATE=false
+      INSTALL_SLACK=false
+      INSTALL_TEAMS=false
+      INSTALL_JB_TOOLBOX=true
+      INSTALL_JB_RIDER=true
+      INSTALL_JB_DATAGRIP=true
+      INSTALL_CURSOR=true
+      INSTALL_VSCODE=true
+      INSTALL_WINDSURF=true
+      INSTALL_MISE_RUNTIMES=true
+      INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=true
+      INSTALL_GEMINI_CLI=true
+      SYNC_HYPR_CONFIGS=true
+      INSTALL_CHEZMOI=true
+      INSTALL_AGE=true
+      SETUP_DOTFILES_MANAGEMENT=true
+      SETUP_DEV_PGPASS=true
+      SETUP_DELL_XPS_9320=false
+      SETUP_DUAL_KEYBOARD=false
+      GENERATE_REMMINA_CONNECTIONS=true
+      ;;
+    "minimal")
+      # Deselect all options
+      INSTALL_GOOGLE_CHROME=false
+      INSTALL_FIREFOX=false
+      INSTALL_COPYQ=false
+      INSTALL_DROPBOX=false
+      INSTALL_AWS_VPN=false
+      INSTALL_POSTMAN=false
+      INSTALL_REMMINA=false
+      INSTALL_ESPANSO=false
+      INSTALL_NANO=false
+      INSTALL_MICRO=false
+      INSTALL_KATE=false
+      INSTALL_SLACK=false
+      INSTALL_TEAMS=false
+      INSTALL_JB_TOOLBOX=false
+      INSTALL_JB_RIDER=false
+      INSTALL_JB_DATAGRIP=false
+      INSTALL_CURSOR=false
+      INSTALL_VSCODE=false
+      INSTALL_WINDSURF=false
+      INSTALL_MISE_RUNTIMES=false
+      INSTALL_CLAUDE_CODE=false
+      INSTALL_CODEX_CLI=false
+      INSTALL_GEMINI_CLI=false
+      SYNC_HYPR_CONFIGS=false
+      INSTALL_CHEZMOI=false
+      INSTALL_AGE=false
+      SETUP_DOTFILES_MANAGEMENT=false
+      SETUP_DEV_PGPASS=false
+      SETUP_DELL_XPS_9320=false
+      SETUP_DUAL_KEYBOARD=false
+      GENERATE_REMMINA_CONNECTIONS=false
+      ;;
+    "dell-xps")
+      # Enable Dell XPS specific configurations
+      SETUP_DELL_XPS_9320=true
+      SETUP_DUAL_KEYBOARD=true
+      # Also apply recommended profile
+      INSTALL_GOOGLE_CHROME=true
+      INSTALL_FIREFOX=false
+      INSTALL_COPYQ=true
+      INSTALL_DROPBOX=true
+      INSTALL_AWS_VPN=false
+      INSTALL_POSTMAN=false
+      INSTALL_REMMINA=false
+      INSTALL_ESPANSO=false
+      INSTALL_NANO=true
+      INSTALL_MICRO=false
+      INSTALL_KATE=false
+      INSTALL_SLACK=false
+      INSTALL_TEAMS=false
+      INSTALL_JB_TOOLBOX=false
+      INSTALL_JB_RIDER=false
+      INSTALL_JB_DATAGRIP=false
+      INSTALL_CURSOR=false
+      INSTALL_VSCODE=true
+      INSTALL_WINDSURF=false
+      INSTALL_MISE_RUNTIMES=true
+      INSTALL_CLAUDE_CODE=true
+      INSTALL_CODEX_CLI=false
+      INSTALL_GEMINI_CLI=false
+      SYNC_HYPR_CONFIGS=true
+      INSTALL_CHEZMOI=false
+      INSTALL_AGE=false
+      SETUP_DOTFILES_MANAGEMENT=false
+      SETUP_DEV_PGPASS=false
+      GENERATE_REMMINA_CONNECTIONS=false
+      echo -e "${GREEN}✓ Dell XPS profile applied - hardware optimizations enabled${NC}"
+      ;;
+    *)
+      echo "Unknown profile: $profile"
+      return 1
+      ;;
+  esac
+  
+  echo -e "${GREEN}✓ Profile '$profile' applied${NC}"
+  sleep 1
+  return 0
 }
 
 # Toggle configuration option
