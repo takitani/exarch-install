@@ -25,7 +25,156 @@ is_entra_id_configured() {
     realm list 2>/dev/null | grep -q "domain-name:" && return 0
   fi
   
+  # Check if himmelblau is configured
+  if systemctl is-active --quiet himmelblaud 2>/dev/null; then
+    return 0
+  fi
+  
   return 1
+}
+
+# Check if Omarchy seamless auto-login is enabled
+is_omarchy_autologin_enabled() {
+  systemctl is-enabled --quiet omarchy-seamless-login.service 2>/dev/null
+}
+
+# Disable Omarchy auto-login to enable authentication (safe method)
+disable_omarchy_autologin() {
+  local backup_dir="/home/$USER/.config/exarch-scripts/backups"
+  
+  info "Preparing to disable Omarchy seamless auto-login for Entra ID authentication..."
+  
+  # Create backup directory
+  mkdir -p "$backup_dir"
+  
+  if is_omarchy_autologin_enabled; then
+    # Backup current state
+    echo "OMARCHY_AUTOLOGIN_WAS_ENABLED=true" > "$backup_dir/omarchy-autologin-state"
+    echo "BACKUP_DATE=$(date -Iseconds)" >> "$backup_dir/omarchy-autologin-state"
+    
+    info "Configuring system for authentication on next boot..."
+    echo "This will NOT terminate your current session."
+    
+    # Disable auto-login service (don't stop it - let current session continue)
+    sudo systemctl disable omarchy-seamless-login.service
+    
+    # Enable getty for manual login on next boot
+    sudo systemctl enable getty@tty1.service
+    
+    # Create a transition marker file
+    echo "TRANSITION_PENDING=true" >> "$backup_dir/omarchy-autologin-state"
+    echo "USER_SESSION_PID=$$" >> "$backup_dir/omarchy-autologin-state"
+    
+    success "Auto-login disabled for next boot. Current session will continue normally."
+    echo
+    echo "Changes applied:"
+    echo "• Auto-login service disabled (takes effect on reboot)"
+    echo "• Manual login enabled for next boot"
+    echo "• Your current Hyprland session will continue running"
+    echo
+    warn "You'll need to reboot to test Entra ID authentication."
+    echo "After reboot, you'll see a login prompt where you can use:"
+    echo "• Your Microsoft Entra ID credentials"
+    echo "• Local user account (as fallback)"
+    
+    return 0
+  else
+    echo "OMARCHY_AUTOLOGIN_WAS_ENABLED=false" > "$backup_dir/omarchy-autologin-state"
+    info "Omarchy auto-login was already disabled."
+    return 0
+  fi
+}
+
+# Safe method to prepare auto-login transition with user confirmation
+prepare_autologin_transition() {
+  local backup_dir="/home/$USER/.config/exarch-scripts/backups"
+  
+  echo
+  info "Auto-login Transition Manager"
+  echo
+  echo "Current situation:"
+  echo "• You're logged in via Omarchy auto-login"
+  echo "• Entra ID authentication is configured"
+  echo "• To use Entra ID login, auto-login must be disabled"
+  echo
+  echo "Transition options:"
+  echo "1) Safe transition: Disable auto-login for next boot (keeps current session)"
+  echo "2) Immediate transition: Reboot now to login screen (will close this session)"
+  echo "3) Cancel and keep auto-login"
+  
+  read -p "Choose option (1-3): " choice
+  
+  case $choice in
+    1)
+      if disable_omarchy_autologin; then
+        echo
+        info "System prepared for manual login. Current session will continue."
+        echo "When you're ready to test Entra ID login:"
+        echo "• Save your work and close applications"
+        echo "• Run: sudo reboot"
+        echo "• Login with your Microsoft credentials at the prompt"
+        return 0
+      else
+        err "Failed to prepare transition"
+        return 1
+      fi
+      ;;
+    2)
+      if disable_omarchy_autologin; then
+        echo
+        warn "This will reboot immediately and close all applications."
+        if ask_yes_no "Continue with immediate reboot?"; then
+          info "Rebooting to login screen..."
+          sleep 2
+          sudo reboot
+        else
+          info "Reboot cancelled. System prepared for manual login on next boot."
+          return 0
+        fi
+      else
+        err "Failed to prepare transition"
+        return 1
+      fi
+      ;;
+    3)
+      info "Transition cancelled. Auto-login remains enabled."
+      return 0
+      ;;
+    *)
+      warn "Invalid choice"
+      return 1
+      ;;
+  esac
+}
+
+# Restore Omarchy auto-login (rollback function)
+restore_omarchy_autologin() {
+  local backup_dir="/home/$USER/.config/exarch-scripts/backups"
+  local state_file="$backup_dir/omarchy-autologin-state"
+  
+  if [[ ! -f "$state_file" ]]; then
+    warn "No backup state found. Cannot determine original auto-login configuration."
+    return 1
+  fi
+  
+  # Source the backup state
+  source "$state_file"
+  
+  info "Restoring Omarchy auto-login configuration..."
+  
+  if [[ "${OMARCHY_AUTOLOGIN_WAS_ENABLED:-false}" == "true" ]]; then
+    # Re-enable auto-login
+    sudo systemctl disable getty@tty1.service
+    sudo systemctl enable omarchy-seamless-login.service
+    sudo systemctl start omarchy-seamless-login.service
+    
+    success "Omarchy auto-login restored."
+    info "System will auto-login as 'opik' on next boot."
+  else
+    info "Auto-login was not previously enabled. No changes made."
+  fi
+  
+  return 0
 }
 
 # Detect Azure AD integration requirements
@@ -745,11 +894,29 @@ configure_entra_system_login() {
     return 1
   fi
   
+  # Install greetd and tuigreet for login screen
+  info "Installing login manager (greetd with tuigreet)..."
+  if ! pac greetd greetd-tuigreet; then
+    err "Failed to install greetd/tuigreet"
+    return 1
+  fi
+  
   # Configure Himmelblau
   info "Configuring Himmelblau for Microsoft Entra ID..."
   
   # Create Himmelblau configuration
   sudo mkdir -p /etc/himmelblau
+  
+  # Get client_id from environment or prompt
+  local CLIENT_ID="${ENTRA_CLIENT_ID:-}"
+  if [[ -z "$CLIENT_ID" ]]; then
+    echo
+    warn "Client ID not found in environment."
+    echo "You need an Entra ID application registration for device authentication."
+    echo "You can create one later using: sudo himmelblau application create"
+    echo "Or provide an existing client_id."
+    read -p "Enter client_id (or press Enter to skip for now): " CLIENT_ID
+  fi
   
   # Configure himmelblaud daemon
   sudo tee /etc/himmelblau/himmelblau.conf > /dev/null << EOF
@@ -758,7 +925,7 @@ configure_entra_system_login() {
 tenant_id = $ENTRA_TENANT_ID
 
 # Application ID for device authentication
-client_id = 
+client_id = $CLIENT_ID
 
 # Domain for user authentication
 domain = exato.digital
@@ -776,6 +943,11 @@ log_level = info
 EOF
 
   success "Himmelblau configured with Tenant ID: $ENTRA_TENANT_ID"
+  if [[ -n "$CLIENT_ID" ]]; then
+    success "Client ID configured: $CLIENT_ID"
+  else
+    warn "Client ID not configured - you'll need to add it later to /etc/himmelblau/himmelblau.conf"
+  fi
   
   # Configure PAM for Himmelblau
   info "Configuring PAM for Himmelblau authentication..."
@@ -813,6 +985,25 @@ EOF
     sudo sed -i 's/^shadow:.*/shadow: files himmelblau/' /etc/nsswitch.conf
   fi
   
+  # Configure greetd
+  info "Configuring greetd login manager..."
+  sudo mkdir -p /etc/greetd
+  sudo tee /etc/greetd/config.toml > /dev/null << 'GREETDEOF'
+[terminal]
+# The VT to run the greeter on
+vt = 1
+
+[default_session]
+# The greeter to run
+command = "tuigreet --remember --remember-user-session --time --issue --asterisks --cmd 'uwsm start -- hyprland.desktop'"
+user = "greeter"
+GREETDEOF
+  
+  # Create greeter user if doesn't exist
+  if ! id greeter &>/dev/null; then
+    sudo useradd -M -G video greeter
+  fi
+  
   # Enable and start Himmelblau daemon
   info "Starting Himmelblau daemon..."
   sudo systemctl enable himmelblaud
@@ -824,6 +1015,19 @@ EOF
     err "Failed to start Himmelblau daemon"
     return 1
   fi
+  
+  # Disable conflicting services and enable greetd
+  info "Configuring login services..."
+  if systemctl is-enabled getty@tty1 &>/dev/null; then
+    sudo systemctl disable getty@tty1
+  fi
+  if systemctl is-enabled omarchy-seamless-login &>/dev/null; then
+    sudo systemctl disable omarchy-seamless-login
+  fi
+  
+  sudo systemctl enable greetd
+  
+  success "Login manager configured. Greetd will start on next boot."
   
   # Configure GDM to show user selection
   if systemctl is-active --quiet gdm; then
@@ -960,6 +1164,62 @@ EOF
 setup_entra_id_complete() {
   info "Setting up Microsoft Entra ID authentication..."
   
+  # Check if already configured
+  if is_entra_id_configured; then
+    warn "Microsoft Entra ID appears to be already configured."
+    echo "Choose an option:"
+    echo "1) Continue with reconfiguration"
+    echo "2) Enable/disable auto-login management" 
+    echo "3) Rollback Entra ID configuration"
+    echo "4) Exit"
+    
+    read -p "Enter choice (1-4): " choice
+    case $choice in
+      1) info "Continuing with reconfiguration..." ;;
+      2) manage_autologin_menu; return $? ;;
+      3) rollback_entra_id_complete; return $? ;;
+      4) return 0 ;;
+      *) warn "Invalid choice. Exiting."; return 1 ;;
+    esac
+  fi
+  
+  # Check for Omarchy auto-login conflict and handle safely
+  if is_omarchy_autologin_enabled; then
+    warn "Omarchy seamless auto-login is enabled. This will prevent Entra ID authentication."
+    echo "Auto-login must be disabled for Entra ID authentication to work properly."
+    echo
+    echo "Choose an option:"
+    echo "1) Use safe transition manager (recommended - keeps current session)"
+    echo "2) Keep auto-login and continue (Entra ID won't work for console login)"
+    echo "3) Exit and configure manually later"
+    
+    read -p "Enter choice (1-3): " autologin_choice
+    case $autologin_choice in
+      1)
+        if ! prepare_autologin_transition; then
+          err "Failed to prepare auto-login transition"
+          return 1
+        fi
+        
+        # Check if user chose immediate reboot - if so, function won't return
+        # If we're here, user chose safe transition, continue with setup
+        echo
+        info "Auto-login transition prepared. Continuing with Entra ID setup..."
+        ;;
+      2)
+        warn "Continuing with auto-login enabled. Entra ID will only work for SSH."
+        ;;
+      3)
+        info "Exiting. You can run this setup again later."
+        return 0
+        ;;
+      *)
+        err "Invalid choice"
+        return 1
+        ;;
+    esac
+  fi
+  
   # Go directly to the essential steps
   echo
   info "This will set up Microsoft Entra ID authentication for your system"
@@ -996,9 +1256,30 @@ setup_entra_id_complete() {
   
   success "Microsoft Entra ID authentication configured successfully!"
   echo
-  echo "You can now:"
+  echo "========================================"
+  echo "NEXT STEPS - IMPORTANT!"
+  echo "========================================"
+  echo
+  if [[ -z "$CLIENT_ID" ]]; then
+    echo "1. Configure client_id in /etc/himmelblau/himmelblau.conf"
+    echo "   You can create an application using:"
+    echo "   sudo himmelblau application create --client-id <existing-app-id> --display-name 'Omarchy Login'"
+    echo
+  fi
+  echo "2. The system will show a login screen (tuigreet) on next boot"
+  echo "   - You can login with local user: opik"
+  echo "   - Or with Entra ID: andre@exato.digital (use your PIN)"
+  echo
+  echo "3. If you need to revert to auto-login:"
+  echo "   sudo systemctl disable greetd"
+  echo "   sudo systemctl enable omarchy-seamless-login"
+  echo
+  echo "4. Reboot to apply changes:"
+  echo "   sudo reboot"
+  echo
+  echo "You can also:"
   echo "• SSH to Azure VMs: az ssh vm -n <vm-name> -g <resource-group>"
-  echo "• Login to this system with: andre@exato.digital (after reboot)"
+  echo "• SSH to this machine: ssh andre@exato.digital@$(hostname)"
   
   return 0
     
@@ -1137,8 +1418,132 @@ setup_entra_id_complete() {
   return 0
 }
 
+# Auto-login management menu
+manage_autologin_menu() {
+  echo
+  info "Auto-login Management"
+  echo "Current status:"
+  
+  if is_omarchy_autologin_enabled; then
+    echo "• Omarchy auto-login: ${GREEN}ENABLED${NC}"
+  else
+    echo "• Omarchy auto-login: ${RED}DISABLED${NC}"
+  fi
+  
+  if is_entra_id_configured; then
+    echo "• Entra ID integration: ${GREEN}CONFIGURED${NC}"
+  else
+    echo "• Entra ID integration: ${RED}NOT CONFIGURED${NC}"
+  fi
+  
+  echo
+  echo "Options:"
+  echo "1) Disable auto-login (enable authentication)"
+  echo "2) Enable auto-login (disable authentication prompts)"
+  echo "3) Back to main menu"
+  
+  read -p "Enter choice (1-3): " choice
+  case $choice in
+    1)
+      disable_omarchy_autologin
+      ;;
+    2)
+      restore_omarchy_autologin
+      ;;
+    3)
+      return 0
+      ;;
+    *)
+      warn "Invalid choice"
+      return 1
+      ;;
+  esac
+}
+
+# Complete rollback of Entra ID configuration
+rollback_entra_id_complete() {
+  warn "This will completely remove Microsoft Entra ID configuration and restore original settings."
+  echo
+  echo "This will:"
+  echo "• Remove himmelblau configuration"
+  echo "• Restore PAM configuration"
+  echo "• Restore auto-login if it was previously enabled"
+  echo "• Remove Azure CLI (if installed by this script)"
+  echo
+  
+  if ! ask_yes_no "Continue with complete rollback?"; then
+    info "Rollback cancelled"
+    return 0
+  fi
+  
+  info "Starting complete Entra ID rollback..."
+  
+  # Stop and disable himmelblau
+  info "Stopping himmelblau services..."
+  sudo systemctl stop himmelblaud 2>/dev/null || true
+  sudo systemctl disable himmelblaud 2>/dev/null || true
+  
+  # Restore PAM configuration (basic restoration)
+  info "Restoring PAM configuration..."
+  sudo sed -i '/pam_himmelblau.so/d' /etc/pam.d/system-auth 2>/dev/null || true
+  
+  # Restore auto-login if needed
+  info "Restoring auto-login configuration..."
+  restore_omarchy_autologin
+  
+  # Remove himmelblau package
+  if pacman -Qi himmelblau >/dev/null 2>&1; then
+    info "Removing himmelblau package..."
+    if ask_yes_no "Remove himmelblau package?"; then
+      yay -R himmelblau || warn "Failed to remove himmelblau package"
+    fi
+  fi
+  
+  success "Entra ID rollback completed!"
+  echo
+  echo "System has been restored to original configuration."
+  echo "You may need to reboot for all changes to take effect."
+  
+  return 0
+}
+
+# Helper function for yes/no prompts
+ask_yes_no() {
+  local prompt="$1"
+  local response
+  
+  # Check if running in non-interactive mode
+  if [[ ! -t 0 ]] || [[ ! -t 1 ]]; then
+    echo "$prompt (y/n): n (auto-answered in non-interactive mode)"
+    return 1
+  fi
+  
+  # Add timeout to prevent infinite loops
+  local attempts=0
+  local max_attempts=3
+  
+  while [[ $attempts -lt $max_attempts ]]; do
+    if read -t 30 -p "$prompt (y/n): " response; then
+      case $response in
+        [Yy]|[Yy][Ee][Ss]) return 0 ;;
+        [Nn]|[Nn][Oo]) return 1 ;;
+        *) echo "Please answer yes (y) or no (n)." ;;
+      esac
+    else
+      echo -e "\nTimeout or error reading input. Assuming 'no'."
+      return 1
+    fi
+    ((attempts++))
+  done
+  
+  echo "Too many invalid attempts. Assuming 'no'."
+  return 1
+}
+
 # Export functions
 export -f is_entra_id_configured detect_entra_id_requirements install_entra_id_packages
 export -f backup_auth_configuration configure_dns_for_domain configure_time_sync
 export -f join_azure_domain configure_sssd_for_azure configure_pam_for_azure
 export -f test_azure_authentication remove_azure_integration setup_entra_id_complete
+export -f is_omarchy_autologin_enabled disable_omarchy_autologin restore_omarchy_autologin
+export -f prepare_autologin_transition manage_autologin_menu rollback_entra_id_complete ask_yes_no

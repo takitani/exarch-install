@@ -129,4 +129,4 @@ The script automatically detects:
 - Can be forced with `--xps` flag for testing
 
 ## GIT
-- Always generate commit messages in English and without claude as author.
+- Always generate commit messages in English and without Claude as author.
