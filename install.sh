@@ -96,7 +96,11 @@ show_menu() {
     "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
     
   # Only show Dell XPS category if detected or forced
-  if is_dell_xps_9320 || [[ "$FORCE_XPS" == true ]]; then
+  local hw_info
+  hw_info=$(detect_hardware 2>/dev/null || echo "Unknown")
+  
+  # Show XPS menu if: hardware contains XPS, or FORCE_XPS is set, or is_xps_mode returns true
+  if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]] || is_xps_mode; then
     show_menu_category "Dell XPS 13 Plus" \
       "SETUP_DELL_XPS_9320:XPS 13 Plus optimizations (webcam, power)" \
       "SETUP_DUAL_KEYBOARD:Dual keyboard support (BR+US)"

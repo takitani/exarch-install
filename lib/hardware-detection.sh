@@ -18,7 +18,8 @@ is_dell_xps_9320() {
   local hardware
   hardware=$(detect_hardware)
   
-  if [[ "$hardware" == *"XPS 13 9320"* ]] || is_xps_mode; then
+  # Check for XPS models (9320 or others)
+  if [[ "$hardware" == *"XPS 13 9320"* ]] || [[ "$hardware" == *"XPS"* ]] || is_xps_mode; then
     return 0
   fi
   return 1
