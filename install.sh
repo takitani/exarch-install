@@ -764,13 +764,9 @@ main() {
   fi
   
   
-  # Show interactive menu or start direct installation
-  if [[ $# -eq 0 ]]; then
-    interactive_menu
-  else
-    # Direct installation with arguments
-    start_installation
-  fi
+  # Always show interactive menu (even in debug mode)
+  # unless specific test modes are active
+  interactive_menu
 }
 
 # Run main function
