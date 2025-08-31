@@ -221,8 +221,7 @@ install_global_npm_packages() {
   # Essential development packages
   local npm_packages=(
     "typescript"
-    "ts-node" 
-    "@angular/cli"
+    "ts-node"     
     "@vue/cli"
     "create-react-app"
     "vite"
@@ -335,7 +334,7 @@ setup_development_environment() {
   wait_for_background_jobs
   
   # Install container tools (interactive)
-  install_container_tools
+  # install_container_tools
   
   success "Development environment setup completed"
 }

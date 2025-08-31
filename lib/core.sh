@@ -291,5 +291,6 @@ export -f log info warn err success
 export -f show_loading get_system_info backup_file safe_mkdir
 export -f check_not_root check_dependencies ask_yes_no show_progress
 export -f command_exists is_pacman_installed is_aur_installed
-export -f is_debug_mode is_xps_mode is_1pass_test_mode is_remmina_test_modeexport -f write_log write_summary init_logging
+export -f is_debug_mode is_xps_mode is_1pass_test_mode is_remmina_test_mode
+export -f write_log write_summary init_logging
 export -f cleanup_and_exit check_internet
