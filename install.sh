@@ -89,13 +89,18 @@ show_menu() {
     
   show_menu_category "System Configuration" \
     "SYNC_HYPR_CONFIGS:Sync Hypr configs" \
-    "SETUP_DELL_XPS_9320:Dell XPS 13 Plus setup" \
-    "SETUP_DUAL_KEYBOARD:Dual keyboard (BR+US)" \
     "INSTALL_CHEZMOI:chezmoi dotfiles manager" \
     "INSTALL_AGE:Age encryption" \
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
     "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
-    "SETUP_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password" \
+    "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
+    
+  # Only show Dell XPS category if detected or forced
+  if is_dell_xps_9320 || [[ "$FORCE_XPS" == true ]]; then
+    show_menu_category "Dell XPS 13 Plus" \
+      "SETUP_DELL_XPS_9320:XPS 13 Plus optimizations (webcam, power)" \
+      "SETUP_DUAL_KEYBOARD:Dual keyboard support (BR+US)"
+  fi
   
   echo
   show_menu_controls
@@ -445,9 +450,9 @@ toggle_option() {
     25) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
     26) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
     27) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    28) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    29) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
-    30) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    28) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    29) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    30) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
