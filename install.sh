@@ -175,7 +175,7 @@ show_menu_controls() {
 interactive_menu() {
   # Auto-detect Dell XPS on first run
   local hw_info
-  hw_info=$(get_system_info 2>/dev/null || echo "Unknown")
+  hw_info=$(detect_hardware 2>/dev/null || echo "Unknown")
   
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo -e "${YELLOW}🔍 Dell XPS detected - auto-enabling hardware optimizations...${NC}"
