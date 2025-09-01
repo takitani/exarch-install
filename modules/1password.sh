@@ -21,13 +21,13 @@ install_1password_cli() {
     return 0
   fi
   
-  if aur 1password-cli-bin || aur 1password-cli; then
+  if aur 1password-cli; then
     success "1Password CLI installed successfully"
     return 0
   else
     err "Failed to install 1Password CLI automatically"
     echo "   Install manually:"
-    echo "   - Via AUR: yay -S 1password-cli-bin"
+    echo "   - Via AUR: yay -S 1password-cli"
     echo "   - Or download from: https://1password.com/downloads/command-line/"
     return 1
   fi
