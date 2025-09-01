@@ -301,18 +301,28 @@ process_vault_servers() {
   
   info "Processing vault: $vault (category: $category)"
   
-  # Get list of server items from vault
+  # Get list of server items from vault with expanded search
   local server_list
-  # Search in both Server and Login categories since RDP connections can be in either
-  local server_list_server server_list_login filtered_login
+  # Search in multiple categories since RDP connections can be in various places
+  local server_list_server server_list_login server_list_database filtered_login filtered_database
+  
+  # Get items from Server category
   server_list_server=$(op item list --vault "$vault" --categories Server --format json 2>/dev/null || echo "[]")
+  
+  # Get items from Login category
   server_list_login=$(op item list --vault "$vault" --categories Login --format json 2>/dev/null || echo "[]")
   
-  # Filter Login items to only those that look like server connections (EC2, RDP, etc)
-  filtered_login=$(echo "$server_list_login" | jq '[.[] | select(.title | test("EC2|RDP|Remote|Server|VM|VPS|Instance|Host"; "i"))]' 2>/dev/null || echo "[]")
+  # Get items from Database category (sometimes servers are stored here)
+  server_list_database=$(op item list --vault "$vault" --categories Database --format json 2>/dev/null || echo "[]")
   
-  # Combine both lists
-  server_list=$(echo "$server_list_server" "$filtered_login" | jq -s 'flatten' 2>/dev/null || echo "[]")
+  # Filter Login items to only those that look like server connections
+  filtered_login=$(echo "$server_list_login" | jq '[.[] | select(.title | test("EC2|RDP|Remote|Server|VM|VPS|Instance|Host|AWS|Azure|GCP|Cloud|Web|App|API|Backend|Frontend|Prod|Dev|UAT|Test|Staging"; "i"))]' 2>/dev/null || echo "[]")
+  
+  # Filter Database items to only those that look like server connections
+  filtered_database=$(echo "$server_list_database" | jq '[.[] | select(.title | test("EC2|RDP|Remote|Server|VM|VPS|Instance|Host|AWS|Azure|GCP|Cloud|Web|App|API|Backend|Frontend|Prod|Dev|UAT|Test|Staging"; "i"))]' 2>/dev/null || echo "[]")
+  
+  # Combine all lists
+  server_list=$(echo "$server_list_server" "$filtered_login" "$filtered_database" | jq -s 'flatten' 2>/dev/null || echo "[]")
   
   if [[ -z "$server_list" || "$server_list" == "null" || "$server_list" == "[]" ]]; then
     warn "No server items found in vault: $vault"
@@ -367,13 +377,19 @@ process_server_item() {
     return 1
   fi
   
-  # Extract fields
+  # Extract fields with improved detection
   local server_field
   local username_field
   local password_field
   
-  # Try to find server/hostname field (Portuguese + English)
-  server_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("server|hostname|Server|Hostname|Servidor|servidor"; "i")) | .value' 2>/dev/null | head -n1)
+  # Debug: Show all available fields for troubleshooting
+  if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
+    info "Available fields for $item_title:"
+    echo "$item_details" | jq -r '.fields[]? | "  \(.label // "NO_LABEL"): \(.value // "NO_VALUE")"' 2>/dev/null
+  fi
+  
+  # Try to find server/hostname field with expanded patterns
+  server_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("server|hostname|Server|Hostname|Servidor|servidor|address|Address|endereço|endereco|ip|IP|host|Host"; "i")) | .value' 2>/dev/null | head -n1)
   
   # If not found in fields, try URLs (common for EC2 instances)
   if [[ -z "$server_field" || "$server_field" == "null" ]]; then
@@ -384,25 +400,57 @@ process_server_item() {
     fi
   fi
   
-  # Try to find username field (Portuguese + English)  
-  username_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("username|Username|user|User|usuário|usuario|nome.*usuário|nome.*usuario"; "i")) | .value' 2>/dev/null | head -n1)
+  # Try to find username field with expanded patterns
+  username_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("username|Username|user|User|usuário|usuario|nome.*usuário|nome.*usuario|login|Login|account|Account|conta|Conta"; "i")) | .value' 2>/dev/null | head -n1)
   
-  # Try to find password field (Portuguese + English)
-  password_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("password|Password|pass|Pass|senha|Senha"; "i")) | .value' 2>/dev/null | head -n1)
+  # If username not found in fields, try login section
+  if [[ -z "$username_field" || "$username_field" == "null" ]]; then
+    username_field=$(echo "$item_details" | jq -r '.login.username // ""' 2>/dev/null)
+  fi
   
-  # Validate required fields
+  # Try to find password field with expanded patterns
+  password_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("password|Password|pass|Pass|senha|Senha|pwd|Pwd|secret|Secret|chave|Chave"; "i")) | .value' 2>/dev/null | head -n1)
+  
+  # If password not found in fields, try login section
+  if [[ -z "$password_field" || "$password_field" == "null" ]]; then
+    password_field=$(echo "$item_details" | jq -r '.login.password // ""' 2>/dev/null)
+  fi
+  
+  # Additional fallback: try to find any field that might contain the password
+  if [[ -z "$password_field" || "$password_field" == "null" ]]; then
+    # Look for any field with "password" in the value (sometimes passwords are stored in generic fields)
+    password_field=$(echo "$item_details" | jq -r '.fields[] | select(.value | test("^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{}|;:,.<>?]{8,}$"; "i")) | .value' 2>/dev/null | head -n1)
+  fi
+  
+  # Validate required fields with detailed debugging
   if [[ -z "$server_field" || "$server_field" == "null" ]]; then
     warn "No server/hostname found for: $item_title"
+    if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
+      info "Available fields that might contain server info:"
+      echo "$item_details" | jq -r '.fields[]? | select(.label | test("server|hostname|address|ip|host"; "i")) | "  \(.label): \(.value // "NO_VALUE")"' 2>/dev/null
+      info "URLs:"
+      echo "$item_details" | jq -r '.urls[]? | .href // "NO_URL"' 2>/dev/null
+    fi
     return 1
   fi
   
   if [[ -z "$username_field" || "$username_field" == "null" ]]; then
     username_field="$REMMINA_DEFAULT_USERNAME"
     warn "No username found for $item_title, using default: $username_field"
+    if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
+      info "Available fields that might contain username info:"
+      echo "$item_details" | jq -r '.fields[]? | select(.label | test("user|login|account"; "i")) | "  \(.label): \(.value // "NO_VALUE")"' 2>/dev/null
+    fi
   fi
   
   if [[ -z "$password_field" || "$password_field" == "null" ]]; then
     warn "No password found for: $item_title"
+    if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
+      info "Available fields that might contain password info:"
+      echo "$item_details" | jq -r '.fields[]? | select(.label | test("password|pass|senha|secret|chave"; "i")) | "  \(.label): \(.value // "NO_VALUE")"' 2>/dev/null
+      info "Login section:"
+      echo "$item_details" | jq -r '.login // "NO_LOGIN_SECTION"' 2>/dev/null
+    fi
     return 1
   fi
   
@@ -418,6 +466,11 @@ process_server_item() {
 # Main function to setup Remmina connections
 setup_remmina_connections_complete() {
   info "Setting up Remmina RDP connections from 1Password..."
+  
+  # Enable debug mode if requested
+  if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
+    info "DEBUG MODE ENABLED - Will show detailed field information"
+  fi
   
   # Check if Remmina is installed
   if ! detect_remmina; then

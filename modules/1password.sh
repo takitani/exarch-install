@@ -449,65 +449,116 @@ setup_1password_complete() {
       ;;
     "not_configured")
       info "1Password CLI not configured."
-      echo
-      echo "Choose configuration method:"
-      echo -e "1) ${BOLD}Mobile + Desktop Flow${NC} (easiest with phone)"
-      echo "   • Use mobile app to configure desktop"
-      echo "   • Then integrate CLI with desktop"
-      echo -e "2) ${BOLD}Direct CLI${NC} (recommended for scripts)"
-      echo -e "3) ${BOLD}Interactive helper${NC} (all options)"
-      echo -e "4) ${BOLD}Basic manual configuration${NC}"
-      echo
-      echo -n "Choose (1/2/3/4): "
-      read -r config_method
       
-      case "$config_method" in
-        1)
-          if ! configure_1password_mobile_desktop; then
-            err "Mobile + Desktop configuration failed"
-            return 1
-          fi
-          ;;
-        2)
-          if ! configure_1password_cli_direct; then
-            err "Direct CLI configuration failed"
-            return 1
-          fi
-          # Sign in after configuration
-          if ! signin_1password_cli; then
-            err "Failed to sign in after configuration"
-            return 1
-          fi
-          ;;
-        3)
-          if [[ -x "./1password-helper.sh" ]]; then
-            if ./1password-helper.sh; then
-              success "Helper completed successfully"
+      # Loop until valid configuration is chosen
+      while true; do
+        echo
+        echo "Choose configuration method:"
+        echo -e "1) ${BOLD}Mobile + Desktop Flow${NC} (easiest with phone)"
+        echo "   • Use mobile app to configure desktop"
+        echo "   • Then integrate CLI with desktop"
+        echo -e "2) ${BOLD}Direct CLI${NC} (recommended for scripts)"
+        echo -e "3) ${BOLD}Interactive helper${NC} (all options)"
+        echo -e "4) ${BOLD}Basic manual configuration${NC}"
+        echo -e "5) ${BOLD}Skip 1Password configuration${NC}"
+        echo
+        echo -n "Choose (1/2/3/4/5): "
+        read -r config_method
+        
+        case "$config_method" in
+          1)
+            if configure_1password_mobile_desktop; then
+              success "Mobile + Desktop configuration completed successfully!"
+              break
             else
-              err "Helper failed to configure 1Password"
+              err "Mobile + Desktop configuration failed"
+              if ! ask_yes_no "Try a different configuration method?"; then
+                return 1
+              fi
+            fi
+            ;;
+          2)
+            if configure_1password_cli_direct; then
+              # Sign in after configuration
+              if signin_1password_cli; then
+                success "Direct CLI configuration completed successfully!"
+                break
+              else
+                err "Failed to sign in after configuration"
+                if ! ask_yes_no "Try a different configuration method?"; then
+                  return 1
+                fi
+              fi
+            else
+              err "Direct CLI configuration failed"
+              if ! ask_yes_no "Try a different configuration method?"; then
+                return 1
+              fi
+            fi
+            ;;
+          3)
+            if [[ -x "./1password-helper.sh" ]]; then
+              if ./1password-helper.sh; then
+                success "Helper completed successfully"
+                break
+              else
+                err "Helper failed to configure 1Password"
+                if ! ask_yes_no "Try a different configuration method?"; then
+                  return 1
+                fi
+              fi
+            else
+              err "Helper not found, falling back to basic configuration"
+              if op account add; then
+                if signin_1password_cli; then
+                  success "Basic configuration completed successfully!"
+                  break
+                else
+                  err "Failed to sign in after basic configuration"
+                  if ! ask_yes_no "Try a different configuration method?"; then
+                    return 1
+                  fi
+                fi
+              else
+                err "Basic configuration failed"
+                if ! ask_yes_no "Try a different configuration method?"; then
+                  return 1
+                fi
+              fi
+            fi
+            ;;
+          4)
+            info "Basic manual configuration..."
+            if op account add; then
+              if signin_1password_cli; then
+                success "Basic manual configuration completed successfully!"
+                break
+              else
+                err "Failed to sign in after manual configuration"
+                if ! ask_yes_no "Try a different configuration method?"; then
+                  return 1
+                fi
+              fi
+            else
+              err "Manual configuration failed"
+              if ! ask_yes_no "Try a different configuration method?"; then
+                return 1
+              fi
+            fi
+            ;;
+          5)
+            info "Skipping 1Password configuration"
+            return 0
+            ;;
+          *)
+            err "Invalid choice: $config_method"
+            if ! ask_yes_no "Try again?"; then
+              info "Exiting 1Password configuration"
               return 1
             fi
-          else
-            err "Helper not found, falling back to basic configuration"
-            if ! op account add; then
-              return 1
-            fi
-          fi
-          ;;
-        4)
-          info "Basic manual configuration..."
-          if ! op account add; then
-            return 1
-          fi
-          if ! signin_1password_cli; then
-            return 1
-          fi
-          ;;
-        *)
-          err "Invalid choice"
-          return 1
-          ;;
-      esac
+            ;;
+        esac
+      done
       
       success "1Password configured and authenticated successfully!"
       ;;
@@ -617,6 +668,13 @@ process_database_item() {
 generate_pgpass_file() {
   local pgpass_file="$HOME/.pgpass"
   local backup_file=""
+  
+  # Verify 1Password CLI is authenticated before proceeding
+  if ! op account list >/dev/null 2>&1; then
+    err "1Password CLI not authenticated. Cannot generate .pgpass file."
+    info "Please complete 1Password configuration first."
+    return 1
+  fi
   
   # Backup existing file
   if [[ -f "$pgpass_file" ]]; then

@@ -400,6 +400,84 @@ ONEPASSWORD_EMAIL="seu.email@empresa.com"  # Opcional
 - Execute: `op signin` manualmente
 - Ou use: `./setup-1password-pgpass.sh` para configuração guiada
 
+## 🖥️ Configuração Automática: Remmina RDP via 1Password
+
+### Visão Geral
+
+O script oferece integração completa com 1Password CLI para gerar automaticamente conexões RDP do Remmina a partir de credenciais de servidores armazenadas no 1Password.
+
+### Configuração
+
+Adicione ao seu arquivo `.env`:
+```bash
+# Remmina Configuration
+SETUP_REMMINA_CONNECTIONS=true
+ENABLE_REMMINA_MODULE=true
+
+# Vault mappings (opcional)
+VAULT_CATEGORIES=(
+  ["Cloud Prod"]="prod"
+  ["Cloud Dev"]="dev" 
+  ["Personal"]="personal"
+)
+```
+
+### Como usar
+
+#### Modo teste - gera arquivos de exemplo
+```bash
+./install.sh --remmina
+```
+
+#### Modo produção - via menu interativo
+```bash
+./install.sh
+# Selecione: "Gerar conexões Remmina RDP via 1Password"
+```
+
+### Recursos
+
+- **Instalação automática** do Remmina
+- **Busca inteligente** de credenciais de servidores
+- **Suporte multilíngue** (português + inglês) para nomes de campos
+- **Fallbacks múltiplos** para encontrar hostname, username e password
+- **Organização por grupos** (prod, dev, personal)
+- **Modo debug** para troubleshooting
+- **Backup automático** de configurações existentes
+
+### Campos Suportados
+
+O script busca automaticamente por:
+
+**Hostname/Server:**
+- `server`, `hostname`, `address`, `ip`, `host`
+- `Servidor`, `endereço`, `endereco`
+- URLs (extrai hostname automaticamente)
+
+**Username:**
+- `username`, `user`, `login`, `account`
+- `usuário`, `usuario`, `conta`
+- Seção `.login.username`
+
+**Password:**
+- `password`, `pass`, `pwd`, `secret`, `chave`
+- `senha`
+- Seção `.login.password`
+
+### Troubleshooting
+
+**Credenciais não aparecem:**
+- Certifique-se que têm categoria "Server" ou "Login" no 1Password
+- Verifique se está autenticado: `op vault list`
+
+**Campos não são encontrados:**
+- Ative o modo debug: `DEBUG_REMMINA=true ./install.sh`
+- Verifique os nomes dos campos no 1Password
+
+**Erro de autenticação:**
+- Execute: `op signin` manualmente
+- Configure primeiro o 1Password: `./install.sh --1pass`
+
 ## 🎥 Solução Automática: Pipewire Camera no Chrome/Chromium
 
 ### O Problema

@@ -72,6 +72,15 @@ The main installation script is structured as follows:
 - Searches for database credentials
 - Generates `.pgpass` file with proper permissions
 
+#### Remmina RDP Integration (--remmina mode)
+- Automatically installs Remmina
+- Authenticates with 1Password CLI
+- Searches for server credentials in multiple categories (Server, Login, Database)
+- Generates RDP connection files with proper encryption
+- Organizes connections by groups (prod, dev, personal)
+- Supports multilingual field detection (Portuguese + English)
+- Includes debug mode for troubleshooting
+
 #### Dell XPS 13 Plus Support
 - Auto-detects hardware
 - Installs IPU6 webcam drivers
