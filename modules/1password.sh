@@ -231,22 +231,64 @@ configure_1password_mobile_desktop() {
   # Test integration
   echo
   info "Testing integration..."
-  if timeout 5 op account list >/dev/null 2>&1; then
-    success "Integration working!"
+  
+  # Give it a moment for the integration to settle
+  sleep 2
+  
+  # Try multiple ways to detect integration
+  local integration_works=false
+  
+  # Method 1: Try op account list
+  if op account list >/dev/null 2>&1; then
+    success "Integration detected via account list!"
+    integration_works=true
+  # Method 2: Try op whoami  
+  elif op whoami >/dev/null 2>&1; then
+    success "Integration detected via whoami!"
+    integration_works=true
+  # Method 3: Try op vault list
+  elif op vault list >/dev/null 2>&1; then
+    success "Integration detected via vault list!"
+    integration_works=true
+  fi
+  
+  if [[ "$integration_works" == true ]]; then
+    success "CLI integration is working!"
     
-    # Test login
-    if timeout 3 op vault list >/dev/null 2>&1; then
-      success "Automatic login working!"
+    # Test if we can actually use it
+    echo
+    info "Verifying access..."
+    if op vault list >/dev/null 2>&1; then
+      success "Full access confirmed!"
     else
-      info "Signing in via desktop integration..."
-      eval "$(op signin)" || true
+      warn "Partial access - may need to unlock in desktop app"
     fi
     
     return 0
   else
-    err "Integration not detected"
-    echo "Please verify you followed all steps"
-    return 1
+    warn "Integration not automatically detected"
+    echo
+    echo "This might be normal. Let's try manual verification:"
+    echo
+    echo "Please run this command manually:"
+    echo -e "  ${CYAN}op account list${NC}"
+    echo
+    echo "If it shows your account, the integration is working."
+    echo "If it asks for authentication, follow the prompts."
+    echo
+    
+    if ask_yes_no "Did the command work?"; then
+      success "Integration confirmed manually"
+      return 0
+    else
+      err "Integration setup incomplete"
+      echo
+      echo "Please ensure you:"
+      echo "1. Have 1Password desktop open and unlocked"
+      echo "2. Enabled 'Integrate with 1Password CLI' in Developer settings"
+      echo "3. Authorized the integration when prompted"
+      return 1
+    fi
   fi
 }
 
@@ -479,7 +521,8 @@ setup_1password_complete() {
   esac
   
   # Generate .pgpass file
-  return generate_pgpass_file
+  generate_pgpass_file
+  return $?
 }
 
 # Process a database item from 1Password
