@@ -89,6 +89,7 @@ show_menu() {
     
   show_menu_category "System Configuration" \
     "SYNC_HYPR_CONFIGS:Sync Hypr configs" \
+    "SETUP_SHELL_IMPROVEMENTS:Shell improvements (shared history)" \
     "INSTALL_CHEZMOI:chezmoi dotfiles manager" \
     "INSTALL_AGE:Age encryption" \
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
@@ -450,13 +451,14 @@ toggle_option() {
     21) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
     22) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
     23) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    24) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    25) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    26) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    27) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    28) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    29) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    30) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    24) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    25) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    26) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    27) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    28) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    29) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    30) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    31) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -579,6 +581,11 @@ execute_installation_modules() {
   # Dotfiles management
   if module_enabled "dotfiles"; then
     setup_dotfiles_management_complete
+  fi
+  
+  # Shell improvements
+  if [[ "${SETUP_SHELL_IMPROVEMENTS:-false}" == "true" ]]; then
+    setup_shell_improvements
   fi
   
   # Wait for all background jobs to complete
@@ -748,6 +755,65 @@ show_final_report() {
   
   echo
   success "Setup completed successfully! 🎉"
+}
+
+# ======================================
+# SHELL IMPROVEMENTS
+# ======================================
+
+# Configure shell improvements (shared history, etc)
+setup_shell_improvements() {
+  info "Configuring shell improvements..."
+  
+  local bashrc_file="$HOME/.bashrc"
+  local backup_file="$bashrc_file.backup.$(date +%Y%m%d_%H%M%S)"
+  
+  # Check if improvements are already configured
+  if grep -q "PROMPT_COMMAND.*history -a.*history -c.*history -r" "$bashrc_file" 2>/dev/null; then
+    info "Shell improvements already configured"
+    return 0
+  fi
+  
+  # Backup .bashrc
+  if [[ -f "$bashrc_file" ]]; then
+    if backup_file "$bashrc_file" "$backup_file"; then
+      info "Backup created: $backup_file"
+    fi
+  fi
+  
+  # Add shell improvements to .bashrc
+  info "Adding shared history configuration to .bashrc..."
+  
+  cat >> "$bashrc_file" << 'EOF'
+
+# ======================================
+# SHELL IMPROVEMENTS (Added by Exarch Scripts)
+# ======================================
+
+# Configuração para histórico compartilhado em tempo real entre terminais
+export HISTCONTROL=ignoredups:erasedups
+export HISTSIZE=10000
+export HISTFILESIZE=10000
+shopt -s histappend
+
+# Salva e recarrega o histórico após cada comando
+export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
+EOF
+  
+  if [[ $? -eq 0 ]]; then
+    success "Shell improvements configured successfully"
+    echo
+    echo "Improvements added:"
+    echo "• Shared command history between terminals"
+    echo "• Increased history size (10,000 commands)"
+    echo "• Automatic history synchronization"
+    echo "• Duplicate command removal"
+    echo
+    echo "Note: Open a new terminal or run 'source ~/.bashrc' to apply changes"
+  else
+    err "Failed to configure shell improvements"
+    return 1
+  fi
 }
 
 # ======================================
