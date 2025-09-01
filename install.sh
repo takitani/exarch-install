@@ -21,6 +21,7 @@ source "$SCRIPT_DIR/modules/1password.sh"
 source "$SCRIPT_DIR/modules/development.sh"
 source "$SCRIPT_DIR/modules/dell-xps.sh"
 source "$SCRIPT_DIR/modules/remmina.sh"
+source "$SCRIPT_DIR/modules/pipewire-camera.sh"
 
 # ======================================
 # MENU SYSTEM
@@ -576,6 +577,11 @@ execute_installation_modules() {
   # Dell XPS optimizations
   if module_enabled "dell-xps"; then
     setup_dell_xps_9320_complete
+  fi
+  
+  # PipeWire camera support
+  if [[ "${ENABLE_PIPEWIRE_CAMERA_MODULE:-true}" == "true" ]] && command -v setup_pipewire_camera >/dev/null 2>&1; then
+    setup_pipewire_camera
   fi
   
   # Dotfiles management
