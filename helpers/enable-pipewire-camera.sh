@@ -177,10 +177,30 @@ update_desktop_file() {
     if [ -f "$desktop_file" ]; then
         backup_file "$desktop_file"
         
+        # Determinar o executável correto baseado no browser
+        local executable=""
+        local flags="--enable-webrtc-pipewire-camera --enable-features=WebRTCPipeWireCapturer --ozone-platform=wayland --enable-wayland-ime"
+        
+        if [[ "$browser_name" == *"chromium"* ]]; then
+            executable="/usr/bin/chromium"
+        elif [[ "$browser_name" == *"chrome"* ]]; then
+            executable="/usr/bin/google-chrome-stable"
+        else
+            executable="$(which chromium 2>/dev/null || which google-chrome 2>/dev/null || echo "chromium")"
+        fi
+        
         # Adicionar flags ao comando Exec se não existirem
         if ! grep -q "enable-webrtc-pipewire-camera" "$desktop_file"; then
-            sed -i 's/^Exec=\([^ ]*\)/Exec=\1 --enable-webrtc-pipewire-camera --enable-features=WebRTCPipeWireCapturer/' "$desktop_file"
+            # Substituir a linha Exec principal
+            sed -i "s|^Exec=.*|Exec=$executable $flags %U|" "$desktop_file"
+            
+            # Substituir as outras linhas Exec (new-window, incognito)
+            sed -i "s|^Exec=.*--new-window|Exec=$executable $flags --new-window|" "$desktop_file"
+            sed -i "s|^Exec=.*--incognito|Exec=$executable $flags --incognito|" "$desktop_file"
+            
             echo "  ✓ Atualizado: $desktop_file"
+            echo "    Executável: $executable"
+            echo "    Flags: $flags"
         else
             echo "  → Já configurado: $desktop_file"
         fi

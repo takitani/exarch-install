@@ -34,9 +34,10 @@ apply_pipewire_camera_patch() {
   }
 
   # Aguardar navegadores fecharem se estiverem rodando
-  if pgrep -f "chrom(e|ium)" >/dev/null; then
+  if pgrep -f "chromium$" >/dev/null 2>&1 || pgrep -f "google-chrome$" >/dev/null 2>&1; then
     info "Fechando navegadores para aplicar o patch..."
-    pkill -f "chrom(e|ium)" 2>/dev/null || true
+    pkill -f "chromium$" 2>/dev/null || true
+    pkill -f "google-chrome$" 2>/dev/null || true
     sleep 3
   fi
 
@@ -108,16 +109,16 @@ apply_pipewire_camera_patch() {
   info "   3. Teste em meet.google.com, discord.com, ou similar"
 }
 
-# Se executado diretamente (não como source)
+# Definir funções auxiliares básicas se não existirem
+if ! command -v info >/dev/null 2>&1; then
+  info() { echo "ℹ️  $*"; }
+  warn() { echo "⚠️  $*"; }
+  log() { echo "📝 $*"; }
+  success() { echo "✅ $*"; }
+fi
+
+# Se executado diretamente (não como source), executar a função
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  # Definir funções auxiliares básicas se não existirem
-  if ! command -v info >/dev/null 2>&1; then
-    info() { echo "ℹ️  $*"; }
-    warn() { echo "⚠️  $*"; }
-    log() { echo "📝 $*"; }
-    success() { echo "✅ $*"; }
-  fi
-  
   # Executar patch
   apply_pipewire_camera_patch
 fi

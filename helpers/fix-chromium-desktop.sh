@@ -41,7 +41,7 @@ echo "⚠️  This will close all running Chrome/Chromium instances!"
 echo
 
 # Check if browsers are running
-if pgrep -f "chrom(e|ium)" >/dev/null; then
+if pgrep -f "chromium$" >/dev/null 2>&1 || pgrep -f "google-chrome$" >/dev/null 2>&1; then
   echo "🔴 Warning: Chrome/Chromium is currently running"
   read -p "Continue? This will close all browser windows. (y/N): " response
   
@@ -179,3 +179,57 @@ echo "  1. Check PipeWire: systemctl --user status pipewire"
 echo "  2. Run diagnostic: ./helpers/diagnose-chromium-pipewire.sh"
 echo "  3. Check camera permissions in browser settings"
 echo
+
+# Update desktop shortcuts to use flags directly
+echo
+echo "🔧 Updating desktop shortcuts..."
+
+update_desktop_shortcut() {
+  local desktop_file="$1"
+  local browser_name="$2"
+  
+  if [[ -f "$desktop_file" ]]; then
+    # Determine correct executable
+    local executable=""
+    local flags="--enable-webrtc-pipewire-camera --enable-features=WebRTCPipeWireCapturer --ozone-platform=wayland --enable-wayland-ime"
+    
+    if [[ "$browser_name" == *"chromium"* ]]; then
+      executable="/usr/bin/chromium"
+    elif [[ "$browser_name" == *"chrome"* ]]; then
+      executable="/usr/bin/google-chrome-stable"
+    fi
+    
+    if [[ -n "$executable" ]]; then
+      # Create backup
+      cp "$desktop_file" "${desktop_file}.backup" 2>/dev/null || true
+      
+      # Update main Exec line
+      sed -i "s|^Exec=.*|Exec=$executable $flags %U|" "$desktop_file"
+      
+      # Update other Exec lines
+      sed -i "s|^Exec=.*--new-window|Exec=$executable $flags --new-window|" "$desktop_file"
+      sed -i "s|^Exec=.*--incognito|Exec=$executable $flags --incognito|" "$desktop_file"
+      
+      echo "  ✓ Updated: $desktop_file"
+    fi
+  fi
+}
+
+# Update system desktop files (requires sudo)
+for desktop_file in /usr/share/applications/{chromium,google-chrome,google-chrome-stable}.desktop; do
+  if [[ -f "$desktop_file" ]]; then
+    if [[ -w "$desktop_file" ]]; then
+      update_desktop_shortcut "$desktop_file" "$(basename "$desktop_file" .desktop)"
+    else
+      echo "  ⚠️  No permission to modify: $desktop_file"
+      echo "    Run with sudo to update system shortcuts"
+    fi
+  fi
+done
+
+# Update user desktop files
+for desktop_file in "$HOME/.local/share/applications/"{chromium,google-chrome,google-chrome-stable}.desktop; do
+  if [[ -f "$desktop_file" ]]; then
+    update_desktop_shortcut "$desktop_file" "$(basename "$desktop_file" .desktop)"
+  fi
+done

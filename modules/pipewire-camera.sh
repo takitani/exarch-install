@@ -14,12 +14,36 @@
 setup_pipewire_camera() {
   info "Setting up PipeWire camera support for Chrome/Chromium..."
   
-  # Install required packages
+  # Check if we're in debug mode
+  if [[ "${DEBUG_MODE:-false}" == "true" ]]; then
+    info "[DEBUG] Configurando suporte à webcam PipeWire (simulado)"
+    CONFIGURED_RUNTIMES+=("PipeWire Camera support (simulado)")
+    return 0
+  fi
+  
+  # Use the isolated script if available
+  local fix_script="$(dirname "${BASH_SOURCE[0]}")/../helpers/fix-chromium-desktop.sh"
+  
+  if [[ -f "$fix_script" ]] && [[ -x "$fix_script" ]]; then
+    info "Using isolated fix-chromium-desktop.sh script..."
+    
+    # Run the script in non-interactive mode
+    if bash "$fix_script" --non-interactive 2>/dev/null; then
+      success "PipeWire camera support configured successfully"
+      CONFIGURED_RUNTIMES+=("PipeWire Camera support - Chrome/Chromium configurados")
+      return 0
+    else
+      warn "Isolated script failed, falling back to direct patch"
+    fi
+  fi
+  
+  # Fallback: Install required packages
   pac pipewire-libcamera || warn "Failed to install pipewire-libcamera"
   
   # Apply the camera patch
   if command -v apply_pipewire_camera_patch >/dev/null 2>&1; then
     apply_pipewire_camera_patch
+    CONFIGURED_RUNTIMES+=("PipeWire Camera support - Chrome/Chromium configurados")
   else
     warn "PipeWire camera patch function not available"
     return 1
