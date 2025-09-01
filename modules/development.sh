@@ -265,6 +265,7 @@ install_development_tools() {
   # Remote desktop
   if [[ "${INSTALL_REMMINA:-true}" == "true" ]]; then
     pac remmina
+    pac freerdp || warn "Failed to install FreeRDP plugin"
   fi
   
   # Text expansion

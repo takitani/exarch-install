@@ -7,9 +7,10 @@
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh"
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/remmina.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/remmina.sh"
 
-# Environment variables to control 1Password behavior
-export OP_BIOMETRIC_UNLOCK_ENABLED=false  # Prevent biometric prompts
-export OP_DEVICE=false  # Prevent device authentication
+# Environment variables to control 1Password behavior (set per function when needed)
+# Note: These are NOT exported globally to avoid breaking desktop integration
+# OP_BIOMETRIC_UNLOCK_ENABLED=false  # Prevent biometric prompts (CLI-only mode)
+# OP_DEVICE=false  # Prevent device authentication (CLI-only mode)
 export ONEPASSWORD_CLI_ONLY="${ONEPASSWORD_CLI_ONLY:-false}"  # CLI-only mode flag
 
 # 1Password CLI Installation and Setup
@@ -108,18 +109,47 @@ open_1password_desktop() {
 
 # Check 1Password CLI account status
 check_1password_status() {
-  local config_file="$HOME/.config/op/config"
+  # First check if CLI can actually list accounts with real data (desktop integration)
+  local account_output
+  account_output=$(timeout 5 op account list 2>&1)
+  local account_exit=$?
   
-  # Check if accounts are configured
-  if [[ -f "$config_file" ]] && [[ -s "$config_file" ]]; then
-    # Check if logged in
-    if timeout 3 op vault list >/dev/null 2>&1; then
+  if [[ $account_exit -eq 0 ]] && [[ -n "$account_output" ]] && echo "$account_output" | grep -q "@"; then
+    # Has real account data, now check vault access
+    local vault_test
+    vault_test=$(timeout 10 op vault list 2>&1)
+    local vault_exit=$?
+    
+    # Debug output for troubleshooting
+    if [[ ${DEBUG_1PASS:-false} == true ]]; then
+      echo "DEBUG: account_output='$account_output'" >&2
+      echo "DEBUG: vault_exit=$vault_exit" >&2
+      echo "DEBUG: vault_test='$vault_test'" >&2
+    fi
+    
+    if [[ $vault_exit -eq 0 ]]; then
       echo "authenticated"
     else
       echo "configured_not_logged_in"
     fi
-  else
+  elif [[ $account_exit -eq 0 ]]; then
+    # CLI responds but no real account data - this means not configured
+    if [[ ${DEBUG_1PASS:-false} == true ]]; then
+      echo "DEBUG: CLI responds but no account data: '$account_output'" >&2
+    fi
     echo "not_configured"
+  else
+    # Check for traditional config file (manual configuration)
+    local config_file="$HOME/.config/op/config"
+    if [[ -f "$config_file" ]] && [[ -s "$config_file" ]] && grep -q '"accounts":' "$config_file" && ! grep -q '"accounts": null' "$config_file"; then
+      if timeout 10 op vault list >/dev/null 2>&1; then
+        echo "authenticated"
+      else
+        echo "configured_not_logged_in"
+      fi
+    else
+      echo "not_configured"
+    fi
   fi
 }
 
@@ -228,140 +258,30 @@ configure_1password_mobile_desktop() {
   echo -e "5. You should see an authorization prompt in 1Password desktop"
   echo -e "6. Click ${BOLD}'Allow'${NC} or ${BOLD}'Authorize'${NC} when prompted"
   echo
-  echo "Press ENTER when you've enabled CLI integration (don't worry about authorization yet)..."
+  echo "Press ENTER when finished..."
   read -r
-  
-  # Force authorization prompt
-  echo
-  info "Forcing authorization prompt..."
-  echo "Running: op account list"
-  
-  local auth_result
-  auth_result=$(op account list 2>&1)
-  
-  if echo "$auth_result" | grep -q "No accounts configured"; then
-    echo "Output: $auth_result"
-    echo
-    warn "No authorization prompt appeared automatically"
-    echo "Please check 1Password desktop app for an authorization request."
-    echo "If no prompt appears:"
-    echo "1. Go back to Settings → Developer"
-    echo "2. DISABLE 'Integrate with 1Password CLI'"
-    echo "3. RE-ENABLE 'Integrate with 1Password CLI'"
-    echo "4. Try again"
-    echo
-    echo "Press ENTER after authorizing..."
-    read -r
-  elif echo "$auth_result" | grep -q "@"; then
-    success "Authorization successful!"
-    echo "Found account(s): $auth_result"
-  else
-    echo "Output: $auth_result"
-    echo "Press ENTER after handling any authorization prompts..."
-    read -r
-  fi
   
   # Test integration
   echo
   info "Testing integration..."
-  
-  # Give it a moment for the integration to settle
-  sleep 2
-  
-  # Try multiple ways to detect integration
-  local integration_works=false
-  
-  # Method 1: Try op account list
-  if op account list >/dev/null 2>&1; then
-    success "Integration detected via account list!"
-    integration_works=true
-  # Method 2: Try op whoami  
-  elif op whoami >/dev/null 2>&1; then
-    success "Integration detected via whoami!"
-    integration_works=true
-  # Method 3: Try op vault list
-  elif op vault list >/dev/null 2>&1; then
-    success "Integration detected via vault list!"
-    integration_works=true
-  fi
-  
-  if [[ "$integration_works" == true ]]; then
-    success "CLI integration is working!"
+  if timeout 5 op account list >/dev/null 2>&1; then
+    success "Integration working!"
     
-    # Test if we can actually use it
-    echo
-    info "Verifying access..."
-    local vault_output
-    vault_output=$(op vault list 2>&1)
-    
-    if echo "$vault_output" | grep -q "No accounts configured"; then
-      warn "Integration detected but authorization may be incomplete"
-      echo
-      echo "This usually means the CLI integration is enabled but not authorized."
-      echo "Let's try to trigger the authorization:"
-      echo
-      
-      info "Attempting to trigger authorization prompt..."
-      echo "Running: op account list"
-      
-      # Try to trigger authorization
-      local auth_output
-      auth_output=$(op account list 2>&1)
-      echo "Output: $auth_output"
-      echo
-      
-      if echo "$auth_output" | grep -q "No accounts configured"; then
-        echo "Still no accounts configured. Let's try manual steps:"
-        echo
-        echo "1. Make sure 1Password desktop is open and unlocked"
-        echo "2. In desktop settings, DISABLE and then RE-ENABLE 'Integrate with 1Password CLI'"
-        echo "3. Try running 'op account list' in another terminal"
-        echo "4. Look for authorization prompt in 1Password desktop"
-        echo
-        
-        if ask_yes_no "Have you completed these steps and see the authorization prompt?"; then
-          info "Great! Now try the integration again..."
-          return 0
-        else
-          err "Manual authorization needed - see instructions above"
-          return 1
-        fi
-      else
-        success "Authorization triggered successfully!"
-        return 0
-      fi
-    elif op vault list >/dev/null 2>&1; then
-      success "Full access confirmed!"
-      return 0
+    # Test login
+    if timeout 10 op vault list >/dev/null 2>&1; then
+      success "Automatic login working!"
     else
-      warn "Integration working but authentication needed"
-      echo "Output: $vault_output"
-      return 0
-    fi
-  else
-    warn "Integration not automatically detected"
-    echo
-    echo "This might be normal. Let's try manual verification:"
-    echo
-    echo "Please run this command manually:"
-    echo -e "  ${CYAN}op account list${NC}"
-    echo
-    echo "If it shows your account, the integration is working."
-    echo "If it asks for authentication, follow the prompts."
-    echo
-    
-    if ask_yes_no "Did the command work?"; then
-      success "Integration confirmed manually"
-      return 0
-    else
-      err "Integration setup incomplete"
-      echo
-      echo "Please ensure you:"
-      echo "1. Have 1Password desktop open and unlocked"
-      echo "2. Enabled 'Integrate with 1Password CLI' in Developer settings"
-      echo "3. Authorized the integration when prompted"
+      warn "Desktop integration enabled but vault access failed"
+      echo "This usually means the desktop app needs to be unlocked"
+      echo "Please unlock 1Password desktop app and try again"
       return 1
     fi
+    
+    return 0
+  else
+    err "Integration not detected"
+    echo "Please verify you followed all steps"
+    return 1
   fi
 }
 
@@ -629,22 +549,22 @@ process_database_item() {
   username=""
   password=""
   
-  # Parse fields with flexible field name matching
+  # Parse fields with flexible field name matching (Portuguese + English)
   while IFS=':' read -r label value; do
     case "${label,,}" in
-      *host*|*server*|*address*)
+      *host*|*server*|*address*|*servidor*)
         [[ -z "$hostname" ]] && hostname="$value"
         ;;
-      *port*)
+      *port*|*porta*)
         [[ -z "$port" ]] && port="$value"
         ;;
-      *database*|*db*|*schema*)
+      *database*|*db*|*schema*|*banco*)
         [[ -z "$database" ]] && database="$value"
         ;;
-      *user*|*login*)
+      *user*|*login*|*usuário*|*usuario*)
         [[ -z "$username" ]] && username="$value"
         ;;
-      *pass*|*pwd*)
+      *pass*|*pwd*|*senha*)
         [[ -z "$password" ]] && password="$value"
         ;;
     esac

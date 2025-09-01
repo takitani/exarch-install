@@ -303,7 +303,16 @@ process_vault_servers() {
   
   # Get list of server items from vault
   local server_list
-  server_list=$(op item list --vault "$vault" --categories Server --format json 2>/dev/null)
+  # Search in both Server and Login categories since RDP connections can be in either
+  local server_list_server server_list_login filtered_login
+  server_list_server=$(op item list --vault "$vault" --categories Server --format json 2>/dev/null || echo "[]")
+  server_list_login=$(op item list --vault "$vault" --categories Login --format json 2>/dev/null || echo "[]")
+  
+  # Filter Login items to only those that look like server connections (EC2, RDP, etc)
+  filtered_login=$(echo "$server_list_login" | jq '[.[] | select(.title | test("EC2|RDP|Remote|Server|VM|VPS|Instance|Host"; "i"))]' 2>/dev/null || echo "[]")
+  
+  # Combine both lists
+  server_list=$(echo "$server_list_server" "$filtered_login" | jq -s 'flatten' 2>/dev/null || echo "[]")
   
   if [[ -z "$server_list" || "$server_list" == "null" || "$server_list" == "[]" ]]; then
     warn "No server items found in vault: $vault"
@@ -363,14 +372,23 @@ process_server_item() {
   local username_field
   local password_field
   
-  # Try to find server/hostname field
-  server_field=$(echo "$item_details" | jq -r '.fields[] | select(.label == "server" or .label == "hostname" or .label == "Server" or .label == "Hostname" or .id == "hostname") | .value' 2>/dev/null | head -n1)
+  # Try to find server/hostname field (Portuguese + English)
+  server_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("server|hostname|Server|Hostname|Servidor|servidor"; "i")) | .value' 2>/dev/null | head -n1)
   
-  # Try to find username field
-  username_field=$(echo "$item_details" | jq -r '.fields[] | select(.label == "username" or .label == "Username" or .id == "username") | .value' 2>/dev/null | head -n1)
+  # If not found in fields, try URLs (common for EC2 instances)
+  if [[ -z "$server_field" || "$server_field" == "null" ]]; then
+    server_field=$(echo "$item_details" | jq -r '.urls[]? | .href' 2>/dev/null | head -n1)
+    # Extract hostname from URL if it looks like a URL
+    if [[ "$server_field" =~ ^https?:// ]]; then
+      server_field=$(echo "$server_field" | sed -E 's|.*://([^:/]+).*|\1|')
+    fi
+  fi
   
-  # Try to find password field
-  password_field=$(echo "$item_details" | jq -r '.fields[] | select(.label == "password" or .label == "Password" or .id == "password") | .value' 2>/dev/null | head -n1)
+  # Try to find username field (Portuguese + English)  
+  username_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("username|Username|user|User|usuário|usuario|nome.*usuário|nome.*usuario"; "i")) | .value' 2>/dev/null | head -n1)
+  
+  # Try to find password field (Portuguese + English)
+  password_field=$(echo "$item_details" | jq -r '.fields[] | select(.label | test("password|Password|pass|Pass|senha|Senha"; "i")) | .value' 2>/dev/null | head -n1)
   
   # Validate required fields
   if [[ -z "$server_field" || "$server_field" == "null" ]]; then
