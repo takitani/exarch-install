@@ -5,17 +5,28 @@
 
 set -e
 
-# Get script directory
+# Get script directory and find the project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Check if running from the script directory
-if [[ ! -f "$SCRIPT_DIR/helpers/pipewire-camera-patch.sh" ]]; then
-  echo "❌ Error: Must be run from the exarch-scripts directory"
+# Check if we can find the patch file
+PATCH_FILE=""
+if [[ -f "$SCRIPT_DIR/pipewire-camera-patch.sh" ]]; then
+  # Running from helpers/ directory
+  PATCH_FILE="$SCRIPT_DIR/pipewire-camera-patch.sh"
+elif [[ -f "$PROJECT_ROOT/helpers/pipewire-camera-patch.sh" ]]; then
+  # Running from project root
+  PATCH_FILE="$PROJECT_ROOT/helpers/pipewire-camera-patch.sh"
+else
+  echo "❌ Error: Cannot find pipewire-camera-patch.sh"
+  echo "   Looked in:"
+  echo "   - $SCRIPT_DIR/pipewire-camera-patch.sh"
+  echo "   - $PROJECT_ROOT/helpers/pipewire-camera-patch.sh"
   exit 1
 fi
 
 # Source the patch implementation
-source "$SCRIPT_DIR/helpers/pipewire-camera-patch.sh"
+source "$PATCH_FILE"
 
 echo "🎥 Chrome/Chromium PipeWire Camera Fix"
 echo "======================================"
