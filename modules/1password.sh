@@ -637,7 +637,7 @@ generate_pgpass_file() {
   info "Searching for database credentials in 1Password..."
   
   local db_items
-  if ! db_items=$(op item list --categories=database --format=json 2>/dev/null); then
+  if ! db_items=$(op item list --categories Database --format=json 2>/dev/null); then
     err "Failed to list database credentials from 1Password"
     return 1
   fi
