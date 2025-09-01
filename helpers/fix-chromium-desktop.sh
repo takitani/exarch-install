@@ -35,7 +35,7 @@ echo "This script will configure PipeWire camera support for Chrome/Chromium:"
 echo "• Install pipewire-libcamera package"
 echo "• Configure Chrome/Chromium flags files" 
 echo "• Force flags as 'Enabled' in browser preferences"
-echo "• Modify desktop shortcuts to include camera flags"
+echo "• Create/modify desktop shortcuts"
 echo
 echo "⚠️  This will close all running Chrome/Chromium instances!"
 echo
@@ -62,6 +62,54 @@ else
   exit 1
 fi
 
+# Create flag files first (before applying patch)
+echo
+echo "🏴 Creating browser flag files..."
+
+# Create Chromium flags file
+chromium_flags="$HOME/.config/chromium-flags.conf"
+mkdir -p "$(dirname "$chromium_flags")"
+if [[ ! -f "$chromium_flags" ]]; then
+  touch "$chromium_flags"
+  echo "📄 Created $chromium_flags"
+fi
+
+# Required flags for Chromium
+required_chromium_flags=(
+  "--enable-webrtc-pipewire-camera"
+  "--enable-features=WebRTCPipeWireCapturer"
+  "--ozone-platform=wayland"
+  "--enable-wayland-ime"
+)
+
+echo "🔧 Configuring Chromium flags..."
+for flag in "${required_chromium_flags[@]}"; do
+  if ! grep -Fxq "$flag" "$chromium_flags"; then
+    echo "$flag" >> "$chromium_flags"
+    echo "  + Added: $flag"
+  else
+    echo "  ✓ Already present: $flag"
+  fi
+done
+
+# Create Chrome flags file
+chrome_flags="$HOME/.config/google-chrome-flags.conf"
+mkdir -p "$(dirname "$chrome_flags")"
+if [[ ! -f "$chrome_flags" ]]; then
+  touch "$chrome_flags"
+  echo "📄 Created $chrome_flags"
+fi
+
+echo "🔧 Configuring Chrome flags..."
+for flag in "${required_chromium_flags[@]}"; do
+  if ! grep -Fxq "$flag" "$chrome_flags"; then
+    echo "$flag" >> "$chrome_flags"
+    echo "  + Added: $flag"
+  else
+    echo "  ✓ Already present: $flag"
+  fi
+done
+
 echo
 echo "🎯 Applying PipeWire camera patch..."
 apply_pipewire_camera_patch
@@ -69,15 +117,50 @@ apply_pipewire_camera_patch
 echo
 echo "✅ Fix completed successfully!"
 echo
-echo "📋 Next steps:"
-echo "1. Open Chrome/Chromium"
-echo "2. Go to chrome://flags"
-echo "3. Search for 'pipewire'"
-echo "4. Verify flags show as 'Enabled' (not 'Default')"
-echo "5. Test camera at https://meet.google.com or https://webcamtests.com"
+
+# Show what was configured
+echo "📄 Configuration Summary:"
+echo "========================="
 echo
-echo "🔧 If flags still show as 'Default', try:"
-echo "   • Close ALL browser windows completely"
-echo "   • Wait 5 seconds"
-echo "   • Reopen browser"
+echo "Chromium flags file: $chromium_flags"
+if [[ -f "$chromium_flags" ]]; then
+  echo "  Content:"
+  sed 's/^/    /' "$chromium_flags"
+else
+  echo "  ❌ File not created"
+fi
+echo
+
+echo "Chrome flags file: $chrome_flags"  
+if [[ -f "$chrome_flags" ]]; then
+  echo "  Content:"
+  sed 's/^/    /' "$chrome_flags"
+else
+  echo "  ❌ File not created"
+fi
+echo
+
+echo "📋 Next Steps:"
+echo "=============="
+echo "1. 🌐 Open Chrome/Chromium (it should now use the flags automatically)"
+echo "2. 🔍 Check chrome://flags and search for 'pipewire'"
+echo "3. ✅ Verify 'WebRTC PipeWire support' shows as 'Enabled'"
+echo "4. 🎥 Test camera at:"
+echo "   • https://webcamtests.com"  
+echo "   • https://meet.google.com"
+echo "   • https://webrtc.github.io/samples/src/content/getusermedia/gum/"
+echo
+echo "🔧 Troubleshooting:"
+echo "=================="
+echo "If flags still show 'Default' instead of 'Enabled':"
+echo "  1. Close ALL browser windows/tabs completely"
+echo "  2. Kill any background browser processes:"
+echo "     pkill -f chromium; pkill -f chrome"
+echo "  3. Wait 5 seconds"
+echo "  4. Start browser fresh"
+echo
+echo "If camera still not working:"
+echo "  1. Check PipeWire: systemctl --user status pipewire"
+echo "  2. Run diagnostic: ./helpers/diagnose-chromium-pipewire.sh"
+echo "  3. Check camera permissions in browser settings"
 echo
