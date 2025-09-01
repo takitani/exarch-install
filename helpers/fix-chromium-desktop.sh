@@ -84,7 +84,7 @@ required_chromium_flags=(
 
 echo "🔧 Configuring Chromium flags..."
 for flag in "${required_chromium_flags[@]}"; do
-  if ! grep -Fxq "$flag" "$chromium_flags"; then
+  if ! grep -Fxq -- "$flag" "$chromium_flags" 2>/dev/null; then
     echo "$flag" >> "$chromium_flags"
     echo "  + Added: $flag"
   else
@@ -102,7 +102,7 @@ fi
 
 echo "🔧 Configuring Chrome flags..."
 for flag in "${required_chromium_flags[@]}"; do
-  if ! grep -Fxq "$flag" "$chrome_flags"; then
+  if ! grep -Fxq -- "$flag" "$chrome_flags" 2>/dev/null; then
     echo "$flag" >> "$chrome_flags"
     echo "  + Added: $flag"
   else
@@ -112,7 +112,22 @@ done
 
 echo
 echo "🎯 Applying PipeWire camera patch..."
-apply_pipewire_camera_patch
+
+# Define basic logging functions if not available
+if ! command -v info >/dev/null 2>&1; then
+  info() { echo "ℹ️  $*"; }
+  warn() { echo "⚠️  $*"; }
+  log() { echo "📝 $*"; }
+  success() { echo "✅ $*"; }
+  err() { echo "❌ $*"; }
+fi
+
+# Apply the patch with proper error handling
+if apply_pipewire_camera_patch; then
+  echo "✅ PipeWire camera patch applied successfully"
+else
+  echo "⚠️  Some issues occurred during patch application, but flags were configured"
+fi
 
 echo
 echo "✅ Fix completed successfully!"
