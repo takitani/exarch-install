@@ -87,13 +87,13 @@ open_1password_desktop() {
   info "Opening 1Password desktop app..."
   
   if command_exists 1password; then
-    1password & 2>/dev/null
+    nohup 1password >/dev/null 2>&1 & disown
     return 0
   fi
   
   # Try via flatpak
   if command_exists flatpak && flatpak list 2>/dev/null | grep -q "com.onepassword.OnePassword"; then
-    flatpak run com.onepassword.OnePassword & 2>/dev/null
+    nohup flatpak run com.onepassword.OnePassword >/dev/null 2>&1 & disown
     return 0
   fi
   
@@ -258,13 +258,35 @@ configure_1password_mobile_desktop() {
     # Test if we can actually use it
     echo
     info "Verifying access..."
-    if op vault list >/dev/null 2>&1; then
-      success "Full access confirmed!"
-    else
-      warn "Partial access - may need to unlock in desktop app"
-    fi
+    local vault_output
+    vault_output=$(op vault list 2>&1)
     
-    return 0
+    if echo "$vault_output" | grep -q "No accounts configured"; then
+      warn "Integration detected but no accounts configured"
+      echo
+      echo "The CLI integration is working, but you need to:"
+      echo "1. Make sure 1Password desktop app is open and unlocked"
+      echo "2. Try signing into the CLI: op signin"
+      echo "3. Or add an account manually: op account add"
+      echo
+      
+      if ask_yes_no "Try to add account automatically?"; then
+        if op account add; then
+          success "Account added successfully"
+        else
+          warn "Could not add account automatically"
+        fi
+      fi
+      
+      return 0
+    elif op vault list >/dev/null 2>&1; then
+      success "Full access confirmed!"
+      return 0
+    else
+      warn "Integration working but authentication needed"
+      echo "Output: $vault_output"
+      return 0
+    fi
   else
     warn "Integration not automatically detected"
     echo
