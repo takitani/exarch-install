@@ -220,12 +220,15 @@ configure_1password_mobile_desktop() {
   echo -e "${BOLD}Step 4: Enable CLI Integration${NC}"
   echo
   echo "Now in 1Password desktop:"
-  echo -e "1. Go to ${BOLD}Settings/Preferences${NC}"
+  echo -e "1. Go to ${BOLD}Settings/Preferences${NC} (gear icon)"
   echo -e "2. Click on the ${BOLD}Developer${NC} tab"
   echo -e "3. Enable ${BOLD}'Integrate with 1Password CLI'${NC}"
-  echo "4. Authorize when prompted"
+  echo -e "4. ${YELLOW}IMPORTANT:${NC} If no prompt appears, try running a command to trigger it:"
+  echo -e "   Open a terminal and run: ${CYAN}op account list${NC}"
+  echo -e "5. You should see an authorization prompt in 1Password desktop"
+  echo -e "6. Click ${BOLD}'Allow'${NC} or ${BOLD}'Authorize'${NC} when prompted"
   echo
-  echo "Press ENTER when finished..."
+  echo "Press ENTER when you've completed ALL steps including authorization..."
   read -r
   
   # Test integration
@@ -262,23 +265,41 @@ configure_1password_mobile_desktop() {
     vault_output=$(op vault list 2>&1)
     
     if echo "$vault_output" | grep -q "No accounts configured"; then
-      warn "Integration detected but no accounts configured"
+      warn "Integration detected but authorization may be incomplete"
       echo
-      echo "The CLI integration is working, but you need to:"
-      echo "1. Make sure 1Password desktop app is open and unlocked"
-      echo "2. Try signing into the CLI: op signin"
-      echo "3. Or add an account manually: op account add"
+      echo "This usually means the CLI integration is enabled but not authorized."
+      echo "Let's try to trigger the authorization:"
       echo
       
-      if ask_yes_no "Try to add account automatically?"; then
-        if op account add; then
-          success "Account added successfully"
+      info "Attempting to trigger authorization prompt..."
+      echo "Running: op account list"
+      
+      # Try to trigger authorization
+      local auth_output
+      auth_output=$(op account list 2>&1)
+      echo "Output: $auth_output"
+      echo
+      
+      if echo "$auth_output" | grep -q "No accounts configured"; then
+        echo "Still no accounts configured. Let's try manual steps:"
+        echo
+        echo "1. Make sure 1Password desktop is open and unlocked"
+        echo "2. In desktop settings, DISABLE and then RE-ENABLE 'Integrate with 1Password CLI'"
+        echo "3. Try running 'op account list' in another terminal"
+        echo "4. Look for authorization prompt in 1Password desktop"
+        echo
+        
+        if ask_yes_no "Have you completed these steps and see the authorization prompt?"; then
+          info "Great! Now try the integration again..."
+          return 0
         else
-          warn "Could not add account automatically"
+          err "Manual authorization needed - see instructions above"
+          return 1
         fi
+      else
+        success "Authorization triggered successfully!"
+        return 0
       fi
-      
-      return 0
     elif op vault list >/dev/null 2>&1; then
       success "Full access confirmed!"
       return 0
