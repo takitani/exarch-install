@@ -228,8 +228,38 @@ configure_1password_mobile_desktop() {
   echo -e "5. You should see an authorization prompt in 1Password desktop"
   echo -e "6. Click ${BOLD}'Allow'${NC} or ${BOLD}'Authorize'${NC} when prompted"
   echo
-  echo "Press ENTER when you've completed ALL steps including authorization..."
+  echo "Press ENTER when you've enabled CLI integration (don't worry about authorization yet)..."
   read -r
+  
+  # Force authorization prompt
+  echo
+  info "Forcing authorization prompt..."
+  echo "Running: op account list"
+  
+  local auth_result
+  auth_result=$(op account list 2>&1)
+  
+  if echo "$auth_result" | grep -q "No accounts configured"; then
+    echo "Output: $auth_result"
+    echo
+    warn "No authorization prompt appeared automatically"
+    echo "Please check 1Password desktop app for an authorization request."
+    echo "If no prompt appears:"
+    echo "1. Go back to Settings → Developer"
+    echo "2. DISABLE 'Integrate with 1Password CLI'"
+    echo "3. RE-ENABLE 'Integrate with 1Password CLI'"
+    echo "4. Try again"
+    echo
+    echo "Press ENTER after authorizing..."
+    read -r
+  elif echo "$auth_result" | grep -q "@"; then
+    success "Authorization successful!"
+    echo "Found account(s): $auth_result"
+  else
+    echo "Output: $auth_result"
+    echo "Press ENTER after handling any authorization prompts..."
+    read -r
+  fi
   
   # Test integration
   echo
