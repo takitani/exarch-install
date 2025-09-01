@@ -191,6 +191,10 @@ parse_command_line() {
         TEST_1PASS_MODE=true
         info "🔐 1PASSWORD TEST MODE - Testing .pgpass configuration only"
         ;;
+      --sync-ssh)
+        TEST_SSH_MODE=true
+        info "🔑 SSH SYNC MODE - Testing SSH key synchronization from 1Password"
+        ;;
       --remmina)
         TEST_REMMINA_MODE=true
         info "🖥️ REMMINA DEBUG MODE - Testing RDP connection generation"
@@ -221,6 +225,7 @@ show_help() {
   echo "  --debug     Enable debug mode (simulation only)"
   echo "  --xps       Force Dell XPS 13 Plus mode"
   echo "  --1pass     Test 1Password .pgpass configuration only"
+  echo "  --sync-ssh  Test SSH key synchronization from 1Password"
   echo "  --remmina   Test Remmina RDP connection generation (creates sample files)"
   echo "  --help, -h  Show this help message"
   echo
@@ -317,6 +322,12 @@ load_configuration() {
   return 0
 }
 
+# Check if SSH test mode is enabled
+is_ssh_test_mode() {
+  [[ "${TEST_SSH_MODE:-false}" == "true" ]]
+}
+
 # Export configuration functions
 export -f load_env_file init_config_variables validate_config
 export -f parse_command_line show_help save_config load_configuration
+export -f is_ssh_test_mode

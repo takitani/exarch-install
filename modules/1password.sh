@@ -961,3 +961,450 @@ export -f open_1password_desktop check_1password_status signin_1password_cli
 export -f configure_1password_mobile_desktop configure_1password_cli_direct
 export -f setup_1password_complete process_database_item generate_pgpass_file
 export -f test_1password_mode
+
+# SSH Key Management from 1Password
+setup_ssh_keys_from_1password() {
+  if [[ "${SETUP_SSH_KEYS:-false}" != "true" ]]; then
+    info "Skipping SSH keys configuration (not selected)"
+    return 0
+  fi
+
+  info "Configuring SSH keys from 1Password..."
+  
+  # Verify 1Password CLI is authenticated
+  if ! op account list >/dev/null 2>&1; then
+    err "1Password CLI not authenticated. Cannot sync SSH keys."
+    info "Please complete 1Password configuration first."
+    return 1
+  fi
+  
+  # Get SSH key name from user
+  local ssh_key_name=""
+  if [[ -n "${SSH_KEY_NAME:-}" ]]; then
+    ssh_key_name="$SSH_KEY_NAME"
+    info "Using SSH key name from configuration: $ssh_key_name"
+  else
+    echo
+    echo "Enter the name of your SSH key in 1Password:"
+    echo "Example: opiklocal, github-key, server-key, etc."
+    echo
+    echo -n "SSH Key name: "
+    read -r ssh_key_name
+  fi
+  
+  if [[ -z "$ssh_key_name" ]]; then
+    err "SSH key name is required"
+    return 1
+  fi
+  
+  # Search for the specific SSH key in 1Password with retry option
+  while true; do
+    info "Searching for SSH key: $ssh_key_name"
+    
+    local ssh_item
+    if ssh_item=$(op item get "$ssh_key_name" --format=json 2>/dev/null); then
+      break  # Found the key, exit the loop
+    else
+      err "SSH key '$ssh_key_name' not found in 1Password"
+      echo
+      echo "Options:"
+      echo "1. Try again with a different name"
+      echo "2. Exit"
+      echo
+      echo -n "Choose option (1 or 2): "
+      read -r retry_option
+      
+      case "$retry_option" in
+        1)
+          echo
+          echo "Enter the name of your SSH key in 1Password:"
+          echo "Example: opiklocal, github-key, server-key, etc."
+          echo
+          echo -n "SSH Key name: "
+          read -r ssh_key_name
+          
+          if [[ -z "$ssh_key_name" ]]; then
+            err "SSH key name is required"
+            return 1
+          fi
+          ;;
+        2)
+          info "Exiting SSH key configuration"
+          return 1
+          ;;
+        *)
+          warn "Invalid option. Please choose 1 or 2."
+          ;;
+      esac
+    fi
+  done
+  
+  # Process the SSH key
+  local processed_keys=()
+  if process_ssh_key_item_by_name "$ssh_key_name" processed_keys; then
+    success "SSH key '$ssh_key_name' processed successfully"
+    
+    # Set as main key if processed
+    if [[ ${#processed_keys[@]} -gt 0 ]]; then
+      local main_key="${processed_keys[0]}"
+      setup_main_ssh_key "$main_key"
+    fi
+    
+    # Setup SSH agent
+    setup_ssh_agent
+    
+    # Try to sync known_hosts if available
+    sync_known_hosts_from_1password "$ssh_key_name"
+    
+    # Try to sync SSH config if available
+    sync_ssh_config_from_1password "$ssh_key_name"
+    
+    success "SSH key configuration completed!"
+    return 0
+  else
+    err "Failed to process SSH key '$ssh_key_name'"
+    return 1
+  fi
+}
+
+# Process an SSH key item by name from 1Password
+process_ssh_key_item_by_name() {
+  local item_name="$1"
+  local -n keys_ref="$2"
+  
+  info "Processing SSH key: $item_name"
+  
+  # Get item details
+  local item_json
+  if ! item_json=$(op item get "$item_name" --format=json 2>/dev/null); then
+    err "Failed to get item details for $item_name"
+    return 1
+  fi
+  
+  # Extract basic info
+  local title key_type private_key public_key
+  title=$(echo "$item_json" | jq -r '.title // "Unknown"')
+  
+  info "Processing SSH key: $title"
+  
+  # Try to extract private key using op read (more reliable for protected keys)
+  private_key=""
+  public_key=""
+  
+  # Get vault name from item
+  local vault_name
+  vault_name=$(echo "$item_json" | jq -r '.vault.name // "Private"')
+  
+  # Try to read private key using op read with SSH format
+  info "Attempting to read private key using op read..."
+  local private_key_read
+  if private_key_read=$(op read "op://$vault_name/$item_name/private key?ssh-format=openssh" 2>/dev/null); then
+    if [[ -n "$private_key_read" ]] && echo "$private_key_read" | grep -q "BEGIN.*PRIVATE KEY"; then
+      private_key="$private_key_read"
+      success "Successfully read private key using op read"
+    fi
+  fi
+  
+  # Fallback: Check for private key in fields
+  if [[ -z "$private_key" ]]; then
+    local private_key_field
+    private_key_field=$(echo "$item_json" | jq -r '.fields[]? | select(.label | test("private|key|ssh", "i")) | .value // .reference // ""' | head -1)
+    
+    if [[ -n "$private_key_field" ]]; then
+      private_key="$private_key_field"
+    fi
+  fi
+  
+  # Fallback: Check for private key in notes
+  if [[ -z "$private_key" ]]; then
+    local notes
+    notes=$(echo "$item_json" | jq -r '.notes // ""')
+    if [[ -n "$notes" ]] && echo "$notes" | grep -q "BEGIN.*PRIVATE KEY"; then
+      private_key="$notes"
+    fi
+  fi
+  
+  # Try to read public key using op read
+  info "Attempting to read public key using op read..."
+  local public_key_read
+  if public_key_read=$(op read "op://$vault_name/$item_name/public key" 2>/dev/null); then
+    if [[ -n "$public_key_read" ]] && echo "$public_key_read" | grep -q "ssh-"; then
+      public_key="$public_key_read"
+      success "Successfully read public key using op read"
+    fi
+  fi
+  
+  # Fallback: Check for public key in fields
+  if [[ -z "$public_key" ]]; then
+    local public_key_field
+    public_key_field=$(echo "$item_json" | jq -r '.fields[]? | select(.label | test("public|pub", "i")) | .value // .reference // ""' | head -1)
+    
+    if [[ -n "$public_key_field" ]]; then
+      public_key="$public_key_field"
+    fi
+  fi
+  
+  # If no public key found, try to generate from private key
+  if [[ -n "$private_key" ]] && [[ -z "$public_key" ]]; then
+    info "Generating public key from private key..."
+    public_key=$(echo "$private_key" | ssh-keygen -y -f /dev/stdin 2>/dev/null)
+  fi
+  
+  # Validate private key
+  if [[ -z "$private_key" ]] || ! echo "$private_key" | grep -q "BEGIN.*PRIVATE KEY"; then
+    err "Invalid or missing private key for $title"
+    return 1
+  fi
+  
+  # Determine key type and filename
+  local key_filename
+  if echo "$private_key" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+    key_type="ed25519"
+    key_filename="id_ed25519"
+  elif echo "$private_key" | grep -q "BEGIN RSA PRIVATE KEY"; then
+    key_type="rsa"
+    key_filename="id_rsa"
+  elif echo "$private_key" | grep -q "BEGIN DSA PRIVATE KEY"; then
+    key_type="dsa"
+    key_filename="id_dsa"
+  elif echo "$private_key" | grep -q "BEGIN EC PRIVATE KEY"; then
+    key_type="ecdsa"
+    key_filename="id_ecdsa"
+  else
+    key_type="unknown"
+    key_filename="id_${item_name//[^a-zA-Z0-9]/_}"
+  fi
+  
+  # Create SSH directory if it doesn't exist
+  local ssh_dir="$HOME/.ssh"
+  if [[ ! -d "$ssh_dir" ]]; then
+    info "Creating SSH directory: $ssh_dir"
+    mkdir -p "$ssh_dir"
+    chmod 700 "$ssh_dir"
+  fi
+  
+  # Create key files
+  local private_key_file="$HOME/.ssh/$key_filename"
+  local public_key_file="$HOME/.ssh/$key_filename.pub"
+  
+  # Create backup directory for better organization
+  local backup_dir="$HOME/.ssh/backups/$(date +%Y%m%d_%H%M%S)"
+  
+  # Backup existing files with better organization
+  if [[ -f "$private_key_file" ]]; then
+    mkdir -p "$backup_dir"
+    local backup_file="$backup_dir/$(basename "$private_key_file")"
+    if cp "$private_key_file" "$backup_file"; then
+      info "Backup created: $backup_file"
+    fi
+  fi
+  
+  if [[ -f "$public_key_file" ]]; then
+    mkdir -p "$backup_dir"
+    local backup_file="$backup_dir/$(basename "$public_key_file")"
+    if cp "$public_key_file" "$backup_file"; then
+      info "Backup created: $backup_file"
+    fi
+  fi
+  
+  # Write private key
+  echo "$private_key" > "$private_key_file"
+  chmod 600 "$private_key_file"
+  
+  # Write public key
+  if [[ -n "$public_key" ]]; then
+    echo "$public_key" > "$public_key_file"
+    chmod 644 "$public_key_file"
+  fi
+  
+  keys_ref+=("$key_filename")
+  
+  success "Processed SSH key: $key_filename ($key_type)"
+  info "Private key: $private_key_file"
+  info "Public key: $public_key_file"
+  if [[ -d "$backup_dir" ]]; then
+    info "Backups saved to: $backup_dir"
+  fi
+  return 0
+}
+
+# Sync known_hosts from 1Password
+sync_known_hosts_from_1password() {
+  local item_name="$1"
+  
+  info "Checking for known_hosts in SSH key item..."
+  
+  # Get vault name
+  local vault_name
+  vault_name=$(op item get "$item_name" --format=json 2>/dev/null | jq -r '.vault.name // "Private"')
+  
+  # Try to read known_hosts using op read
+  local known_hosts_content
+  if known_hosts_content=$(op read "op://$vault_name/$item_name/known_hosts" 2>/dev/null); then
+    if [[ -n "$known_hosts_content" ]]; then
+      info "Found known_hosts content, syncing..."
+      
+      local known_hosts_file="$HOME/.ssh/known_hosts"
+      local backup_dir="$HOME/.ssh/backups/$(date +%Y%m%d_%H%M%S)"
+      
+      # Backup existing known_hosts
+      if [[ -f "$known_hosts_file" ]]; then
+        mkdir -p "$backup_dir"
+        local backup_file="$backup_dir/known_hosts"
+        if cp "$known_hosts_file" "$backup_file"; then
+          info "Backup created: $backup_file"
+        fi
+      fi
+      
+      # Append or create known_hosts
+      if [[ -f "$known_hosts_file" ]]; then
+        echo "" >> "$known_hosts_file"
+        echo "# Added from 1Password SSH key: $item_name" >> "$known_hosts_file"
+        echo "$known_hosts_content" >> "$known_hosts_file"
+        info "Appended to existing known_hosts"
+      else
+        echo "$known_hosts_content" > "$known_hosts_file"
+        chmod 644 "$known_hosts_file"
+        info "Created new known_hosts file"
+      fi
+      
+      success "Known_hosts synced successfully"
+      return 0
+    fi
+  fi
+  
+  info "No known_hosts found in SSH key item"
+  return 0
+}
+
+# Sync SSH config from 1Password
+sync_ssh_config_from_1password() {
+  local item_name="$1"
+  
+  info "Checking for SSH config in SSH key item..."
+  
+  # Get vault name
+  local vault_name
+  vault_name=$(op item get "$item_name" --format=json 2>/dev/null | jq -r '.vault.name // "Private"')
+  
+  # Try to read config using op read
+  local config_content
+  if config_content=$(op read "op://$vault_name/$item_name/config" 2>/dev/null); then
+    if [[ -n "$config_content" ]]; then
+      info "Found SSH config content, syncing..."
+      
+      local config_file="$HOME/.ssh/config"
+      local backup_dir="$HOME/.ssh/backups/$(date +%Y%m%d_%H%M%S)"
+      
+      # Backup existing config
+      if [[ -f "$config_file" ]]; then
+        mkdir -p "$backup_dir"
+        local backup_file="$backup_dir/config"
+        if cp "$config_file" "$backup_file"; then
+          info "Backup created: $backup_file"
+        fi
+      fi
+      
+      # Create or replace config
+      echo "$config_content" > "$config_file"
+      chmod 600 "$config_file"
+      info "SSH config synced successfully"
+      
+      success "SSH config synced successfully"
+      return 0
+    fi
+  fi
+  
+  info "No SSH config found in SSH key item"
+  return 0
+}
+
+# Setup main SSH key for the system
+setup_main_ssh_key() {
+  local key_filename="$1"
+  local private_key_file="$HOME/.ssh/$key_filename"
+  local public_key_file="$HOME/.ssh/$key_filename.pub"
+  
+  info "Setting up main SSH key: $key_filename"
+  
+  # Only create symlinks for the most common names, not all possible types
+  # This avoids cluttering the .ssh directory with unnecessary symlinks
+  local standard_names=()
+  
+  # Determine which symlinks to create based on the actual key type
+  case "$key_filename" in
+    "id_ed25519")
+      standard_names=("id_rsa")  # Most common fallback name
+      ;;
+    "id_rsa")
+      standard_names=("id_ed25519")  # Modern alternative
+      ;;
+    *)
+      # For other key types, create symlink to id_rsa (most commonly expected)
+      standard_names=("id_rsa")
+      ;;
+  esac
+  
+  for standard_name in "${standard_names[@]}"; do
+    local standard_private="$HOME/.ssh/$standard_name"
+    local standard_public="$HOME/.ssh/$standard_name.pub"
+    
+    # Remove existing symlinks or files
+    if [[ -L "$standard_private" ]]; then
+      rm "$standard_private"
+    fi
+    if [[ -L "$standard_public" ]]; then
+      rm "$standard_public"
+    fi
+    
+    # Create symlinks
+    if [[ -f "$private_key_file" ]]; then
+      ln -sf "$private_key_file" "$standard_private"
+      info "Created symlink: $standard_private -> $private_key_file"
+    fi
+    
+    if [[ -f "$public_key_file" ]]; then
+      ln -sf "$public_key_file" "$standard_public"
+      info "Created symlink: $standard_public -> $public_key_file"
+    fi
+  done
+  
+  # Add to SSH agent
+  if command_exists ssh-add; then
+    ssh-add "$private_key_file" 2>/dev/null || warn "Failed to add key to SSH agent"
+  fi
+  
+  success "Main SSH key configured: $key_filename"
+}
+
+# Setup SSH agent
+setup_ssh_agent() {
+  info "Setting up SSH agent..."
+  
+  # Check if ssh-agent is running
+  if ! pgrep ssh-agent >/dev/null; then
+    info "Starting SSH agent..."
+    eval "$(ssh-agent -s)" >/dev/null 2>&1
+  fi
+  
+  # Add SSH_AUTH_SOCK to shell profile if not present
+  local shell_profile=""
+  if [[ -f "$HOME/.bashrc" ]]; then
+    shell_profile="$HOME/.bashrc"
+  elif [[ -f "$HOME/.zshrc" ]]; then
+    shell_profile="$HOME/.zshrc"
+  fi
+  
+  if [[ -n "$shell_profile" ]]; then
+    if ! grep -q "SSH_AUTH_SOCK" "$shell_profile"; then
+      echo "" >> "$shell_profile"
+      echo "# SSH Agent Configuration" >> "$shell_profile"
+      echo "if [[ -z \"\$SSH_AUTH_SOCK\" ]]; then" >> "$shell_profile"
+      echo "  eval \"\$(ssh-agent -s)\" >/dev/null 2>&1" >> "$shell_profile"
+      echo "fi" >> "$shell_profile"
+      info "Added SSH agent configuration to $shell_profile"
+    fi
+  fi
+  
+  success "SSH agent configured"
+}

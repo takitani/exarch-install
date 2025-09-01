@@ -478,6 +478,111 @@ O script busca automaticamente por:
 - Execute: `op signin` manualmente
 - Configure primeiro o 1Password: `./install.sh --1pass`
 
+## 🔑 Configuração Automática: SSH Keys via 1Password
+
+### Visão Geral
+
+O script oferece integração completa com 1Password CLI para sincronizar e gerenciar chaves SSH automaticamente, incluindo a configuração da chave principal do sistema.
+
+### Funcionalidades
+
+- **Sincronização de chaves existentes** do 1Password para o sistema
+- **Geração de novas chaves** e armazenamento automático no 1Password
+- **Configuração da chave principal** do sistema (usada para git, servidores, etc.)
+- **Suporte a múltiplos tipos** de chave: Ed25519, RSA, ECDSA, DSA
+- **Configuração automática** do SSH agent
+- **Backup automático** de chaves existentes
+- **Criação de symlinks** para nomes padrão (id_rsa, id_ed25519, etc.)
+
+### Como usar
+
+#### Via linha de comando (recomendado)
+```bash
+# Sincronizar SSH key específica
+./install.sh --sync-ssh
+# Será solicitado o nome da chave no 1Password (ex: opiklocal)
+```
+
+#### Via menu interativo
+```bash
+./install.sh
+# Selecione: "SSH keys sync via 1Password"
+```
+
+#### Configuração manual
+```bash
+# Adicione ao seu arquivo .env
+SETUP_SSH_KEYS=true
+SSH_KEY_NAME="opiklocal"  # Nome da chave no 1Password
+```
+
+### Fluxo do processo
+
+1. **Solicita nome da chave** SSH no 1Password (ex: opiklocal)
+2. **Busca a chave específica** no 1Password pelo nome
+3. **Processa a chave**:
+   - Extrai chave privada e pública
+   - Determina tipo de chave automaticamente
+   - Cria arquivos com permissões corretas
+   - Faz backup de arquivos existentes
+4. **Configura como chave principal**:
+   - Cria symlinks para nomes padrão (id_rsa, id_ed25519, etc.)
+   - Configura para uso com git, servidores, etc.
+5. **Configura SSH agent** automaticamente
+
+### Tipos de Chave Suportados
+
+- **Ed25519** (recomendado, mais seguro)
+- **RSA 4096 bits** (compatível com sistemas antigos)
+- **ECDSA** (boa segurança, chaves menores)
+- **DSA** (legado, não recomendado)
+
+### Estrutura no 1Password
+
+As chaves SSH devem estar armazenadas no 1Password com:
+
+**Categoria:** "SSH Key" ou "Secure Note"
+
+**Campos:**
+- `Private Key` (ou similar): Chave privada completa
+- `Public Key` (ou similar): Chave pública
+- `Key Type`: Tipo da chave (opcional)
+- `Comment`: Comentário da chave (opcional)
+
+**Notas:** Se não houver campos específicos, o script busca a chave privada nas notas do item.
+
+### Comandos Úteis
+
+```bash
+# Verificar chaves carregadas no SSH agent
+ssh-add -l
+
+# Testar conexão SSH
+ssh -T git@github.com
+
+# Verificar chaves disponíveis
+ls -la ~/.ssh/
+
+# Adicionar chave manualmente ao agent
+ssh-add ~/.ssh/id_ed25519
+```
+
+### Troubleshooting
+
+**Chaves não aparecem:**
+- Certifique-se que têm categoria "SSH Key" ou "Secure Note" no 1Password
+- Verifique se está autenticado: `op vault list`
+
+**Erro de permissões:**
+- Verifique permissões: `ls -la ~/.ssh/`
+- Chaves privadas devem ter permissão 600
+- Diretório .ssh deve ter permissão 700
+
+**SSH agent não funciona:**
+- Reinicie o terminal após a configuração
+- Verifique se ssh-agent está rodando: `pgrep ssh-agent`
+- Inicie manualmente: `eval $(ssh-agent -s)`
+
 ## 🎥 Solução Automática: Pipewire Camera no Chrome/Chromium
 
 ### O Problema

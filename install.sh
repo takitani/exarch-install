@@ -95,6 +95,7 @@ show_menu() {
     "INSTALL_AGE:Age encryption" \
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
     "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
+    "SETUP_SSH_KEYS:SSH keys sync via 1Password" \
     "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
     
   # Only show Dell XPS category if detected or forced
@@ -568,6 +569,11 @@ execute_installation_modules() {
     setup_1password_complete
   fi
   
+  # SSH keys from 1Password
+  if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
+    setup_ssh_keys_from_1password
+  fi
+  
   # Remmina connections (standalone)
   if module_enabled "remmina"; then
     setup_remmina_connections_complete
@@ -839,15 +845,61 @@ main() {
     exit $?
   fi
   
+
+  
+  if is_ssh_test_mode; then
+    test_ssh_mode
+    exit $?
+  fi
+  
   if is_remmina_test_mode; then
     test_remmina_mode
     exit $?
   fi
   
-  
   # Always show interactive menu (even in debug mode)
   # unless specific test modes are active
   interactive_menu
+}
+
+# Test SSH key synchronization mode
+test_ssh_mode() {
+  echo
+  echo -e "${CYAN}╔═══════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║  ${BOLD}SSH Key Sync Test Mode${NC}${CYAN} ║${NC}"
+  echo -e "${CYAN}╚═══════════════════════════════════════╗${NC}"
+  echo
+  
+  # Enable SSH keys module for testing
+  SETUP_SSH_KEYS=true
+  
+  echo "SSH Key Sync Test Mode"
+  echo "======================"
+  echo
+  echo "This mode will:"
+  echo "• Ask for the name of your SSH key in 1Password"
+  echo "• Download and configure the SSH key"
+  echo "• Set it as the main system key"
+  echo "• Configure SSH agent"
+  echo "• Create backups of existing keys"
+  echo
+  echo "Example key names: opiklocal, github-key, server-key, etc."
+  echo
+  
+  if setup_ssh_keys_from_1password; then
+    success "SSH key sync test completed successfully!"
+    echo
+    echo -e "${BOLD}Generated files:${NC}"
+    echo "  • ~/.ssh/ (SSH directory with keys)"
+    echo "  • Symlinks for standard key names (id_rsa, id_ed25519, etc.)"
+    echo "  • SSH agent configuration in shell profile"
+    echo
+    echo "You can now use SSH with your synced key!"
+    return 0
+  else
+    err "SSH key sync test failed"
+    return 1
+  fi
 }
 
 # Run main function

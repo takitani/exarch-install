@@ -1,0 +1,84 @@
+# Exarch Scripts - Cursor Rules
+
+## Project Overview
+This is a post-installation setup script for Omarchy Linux (Arch-based with Hyprland). The project provides automated configuration for development environments, system tools, and integrations.
+
+## Key Architecture
+- **Modular design**: Each major feature is in its own module under `modules/`
+- **Configuration-driven**: Settings in `config/` files control behavior
+- **Profile-based**: Pre-configured installation profiles for different use cases
+- **Interactive menu**: Modern terminal UI with keyboard navigation
+
+## Important Notes
+
+### Entra ID Integration (WORK IN PROGRESS)
+- The Entra ID (Azure AD) integration is currently **WORK IN PROGRESS** and **NOT USED** in the main installation flow
+- All Entra ID related files are in `entra-id-wip/` directory
+- **DO NOT** reference or integrate Entra ID functionality in new features
+- Focus on 1Password integration instead
+
+### 1Password Integration (ACTIVE)
+- **Primary authentication method** for the project
+- Supports multiple features:
+  - `.pgpass` generation for PostgreSQL connections
+  - SSH key synchronization and management
+  - Remmina RDP connection generation
+- Located in `modules/1password.sh`
+- Fully functional and integrated into main menu
+
+### SSH Key Management
+- **NEW FEATURE**: SSH key sync with 1Password
+- Allows users to:
+  - Sync existing SSH keys from 1Password
+  - Generate new SSH keys and store in 1Password
+  - Set main system SSH key for git, servers, etc.
+  - Automatic SSH agent configuration
+- Supports multiple key types: Ed25519, RSA, ECDSA, DSA
+- Creates symlinks for standard key names (id_rsa, id_ed25519, etc.)
+
+## Development Guidelines
+
+### Adding New Features
+1. Create module in `modules/` directory
+2. Add configuration options to `config/` files
+3. Update profiles in `config/profiles.conf`
+4. Add menu options in `install.sh`
+5. Update documentation in `README.md`
+
+### Code Style
+- Use bash with `set -euo pipefail`
+- Follow existing error handling patterns
+- Use color-coded logging (info, success, warn, err)
+- Include proper backup mechanisms
+- Add debug modes for troubleshooting
+
+### Testing
+- Use `--debug` flag for dry-run testing
+- Test modules individually when possible
+- Verify backup/restore functionality
+- Check error handling paths
+
+## File Structure
+```
+exarch-scripts/
+├── config/           # Configuration files
+├── lib/             # Core libraries
+├── modules/         # Feature modules
+├── helpers/         # Utility scripts
+├── docs/            # Documentation
+├── entra-id-wip/    # WIP Entra ID (NOT USED)
+└── install.sh       # Main installation script
+```
+
+## Environment Variables
+Key variables that control behavior:
+- `SETUP_SSH_KEYS`: Enable SSH key sync with 1Password
+- `SETUP_DEV_PGPASS`: Enable .pgpass generation
+- `ENABLE_1PASSWORD_MODULE`: Enable 1Password features
+- `DEBUG_1PASS`: Enable 1Password debug mode
+
+## Remember
+- **Entra ID is WIP and NOT USED** - focus on 1Password
+- SSH key sync is a **NEW FEATURE** that should be promoted
+- Always test with `--debug` flag first
+- Follow existing patterns for consistency
