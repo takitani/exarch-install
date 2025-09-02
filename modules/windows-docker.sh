@@ -262,6 +262,250 @@ EOF
   return 0
 }
 
+# Install WinApps Launcher for taskbar integration
+install_winapps_launcher() {
+  info "Installing WinApps Launcher for taskbar integration..."
+  
+  if is_debug_mode; then
+    info "[DEBUG] Would install yad and WinApps Launcher"
+    return 0
+  fi
+  
+  # Install yad dependency
+  if ! pacman -Q yad &>/dev/null; then
+    pac yad
+  fi
+  
+  # Install WinApps first if not already done
+  local winapps_dir="$HOME/.local/share/winapps"
+  
+  if [[ ! -d "$winapps_dir" ]]; then
+    warn "WinApps not found, installing it first..."
+    if ! install_winapps; then
+      err "Failed to install WinApps (required for WinApps Launcher)"
+      return 1
+    fi
+  fi
+  
+  # Clone WinApps-Launcher repository  
+  local launcher_dir="$HOME/.local/bin/winapps-src/WinApps-Launcher"
+  mkdir -p "$(dirname "$launcher_dir")"
+  
+  if [[ ! -d "$launcher_dir" ]]; then
+    info "Cloning WinApps-Launcher repository..."
+    git clone https://github.com/winapps-org/WinApps-Launcher.git "$launcher_dir" || {
+      warn "Failed to clone WinApps-Launcher repository"
+      return 1
+    }
+  else
+    info "WinApps-Launcher already installed, updating..."
+    cd "$launcher_dir" && git pull || warn "Failed to update WinApps-Launcher"
+  fi
+  
+  # Make script executable
+  chmod +x "$launcher_dir/WinApps-Launcher.sh"
+  
+  # Create desktop shortcut
+  local desktop_dir="$HOME/.local/share/applications"
+  mkdir -p "$desktop_dir"
+  
+  cat > "$desktop_dir/winapps-launcher.desktop" << EOF
+[Desktop Entry]
+Name=WinApps Launcher
+Comment=Taskbar Launcher for Windows Applications
+Exec=$launcher_dir/WinApps-Launcher.sh
+Icon=$launcher_dir/icon.png
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=true
+EOF
+  
+  # Update desktop database
+  if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database "$desktop_dir" &>/dev/null || true
+  fi
+  
+  success "WinApps Launcher installed and configured"
+  info "You can now launch Windows apps from the WinApps Launcher in your applications menu"
+  
+  return 0
+}
+
+# Generate Windows Docker RDP connection for Remmina
+generate_windows_docker_remmina_connection() {
+  info "Generating Windows Docker RDP connection for Remmina..."
+  
+  # Check if Remmina is available
+  if ! command -v remmina &>/dev/null && ! pacman -Q remmina &>/dev/null; then
+    warn "Remmina not installed, skipping RDP connection generation"
+    return 0
+  fi
+  
+  local remmina_dir="$HOME/.local/share/remmina"
+  local config_file="$remmina_dir/group_local_win-11-docker_localhost-3389.remmina"
+  
+  # Ensure remmina directory exists
+  mkdir -p "$remmina_dir"
+  
+  # Generate Remmina configuration for Windows Docker
+  cat > "$config_file" << 'EOF'
+[remmina]
+password=RXhhcmNoV2luMTE=
+gateway_username=
+notes_text=Generated for Windows 11 Docker container - Use web viewer at http://localhost:8006
+vc=
+window_height=1080
+preferipv6=0
+ssh_tunnel_loopback=0
+serialname=
+tls-seclevel=
+sound=off
+printer_overrides=
+name=Win 11 Docker
+console=0
+colordepth=32
+security=
+precommand=
+disable_fastpath=0
+postcommand=
+left-handed=0
+multitransport=0
+group=local
+server=localhost:3389
+ssh_tunnel_certfile=
+glyph-cache=0
+ssh_tunnel_enabled=0
+disableclipboard=0
+labels=
+audio-output=
+parallelpath=
+monitorids=
+cert_ignore=1
+gateway_server=
+serialpermissive=0
+protocol=RDP
+old-license=0
+ssh_tunnel_password=
+resolution_mode=2
+pth=
+disableautoreconnect=0
+loadbalanceinfo=
+clientbuild=
+clientname=
+resolution_width=1920
+drive=/home/opik/Public
+relax-order-checks=0
+base-cred-for-gw=0
+gateway_domain=
+network=none
+rdp2tcp=
+gateway_password=
+serialdriver=
+rdp_reconnect_attempts=
+profile-lock=0
+domain=
+smartcardname=
+serialpath=
+exec=
+multimon=0
+username=User
+enable-autostart=0
+usb=
+shareprinter=0
+viewmode=1
+restricted-admin=0
+shareparallel=0
+quality=0
+span=0
+ssh_tunnel_passphrase=
+parallelname=
+disablepasswordstoring=0
+execpath=
+shareserial=0
+sharefolder=
+sharesmartcard=0
+keymap=
+ssh_tunnel_username=
+resolution_height=1080
+timeout=
+useproxyenv=0
+no-suppress=0
+dvc=
+microphone=
+freerdp_log_filters=
+gwtransp=http
+window_maximize=1
+ssh_tunnel_server=
+ignore-tls-errors=1
+gateway_usage=0
+ssh_tunnel_auth=2
+ssh_tunnel_privatekey=
+window_width=1920
+websockets=0
+freerdp_log_level=INFO
+disable-smooth-scrolling=0
+EOF
+  
+  success "Created Windows Docker RDP connection: Win 11 Docker"
+  info "Connection details:"
+  info "  • Name: Win 11 Docker"
+  info "  • Server: localhost:3389"
+  info "  • Username: User"
+  info "  • Password: ExarchWin11"
+  info "  • Group: local"
+  info "  • File: $config_file"
+  
+  return 0
+}
+
+# Complete WinApps Launcher setup
+setup_winapps_launcher_complete() {
+  if [[ "${INSTALL_WINAPPS_LAUNCHER:-false}" != "true" ]]; then
+    return 0
+  fi
+  
+  echo
+  echo -e "${EXATO_CYAN}╔══════════════════════════════════════════════╗${NC}"
+  echo -e "${EXATO_CYAN}║  ${BOLD}Setting up WinApps Launcher${NC}              ${EXATO_CYAN}║${NC}"
+  echo -e "${EXATO_CYAN}╚══════════════════════════════════════════════╝${NC}"
+  echo
+  
+  info "Installing WinApps Launcher for seamless Windows app integration..."
+  
+  if ! install_winapps_launcher; then
+    err "Failed to install WinApps Launcher"
+    return 1
+  fi
+  
+  # Check if both Windows Docker and Remmina are installed, then create RDP connection
+  if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]] && [[ "${GENERATE_REMMINA_CONNECTIONS:-false}" == "true" || "${INSTALL_REMMINA:-false}" == "true" ]]; then
+    generate_windows_docker_remmina_connection
+  fi
+  
+  success "WinApps Launcher setup completed successfully!"
+  echo
+  echo -e "${BOLD}What's been installed:${NC}"
+  echo "• yad (GUI toolkit dependency)"
+  echo "• WinApps (for Windows app detection and integration)"
+  echo "• WinApps-Launcher (taskbar launcher for Windows apps)"
+  echo "• Desktop shortcut in applications menu"
+  if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]] && [[ "${GENERATE_REMMINA_CONNECTIONS:-false}" == "true" || "${INSTALL_REMMINA:-false}" == "true" ]]; then
+    echo "• Remmina RDP connection for Windows Docker"
+  fi
+  echo
+  echo -e "${BOLD}Next steps:${NC}"
+  echo "1. Start your Windows Docker container"
+  echo "2. Install Windows applications in the container"  
+  echo "3. Launch 'WinApps Launcher' from applications menu"
+  echo "4. Windows apps will appear as native Linux applications"
+  if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]] && [[ "${GENERATE_REMMINA_CONNECTIONS:-false}" == "true" || "${INSTALL_REMMINA:-false}" == "true" ]]; then
+    echo "5. Use Remmina 'Win 11 Docker' connection for direct RDP access"
+  fi
+  
+  return 0
+}
+
 # Show Windows Docker status and access information
 show_windows_docker_info() {
   echo
@@ -347,6 +591,11 @@ setup_windows_docker_complete() {
   
   # Install WinApps for seamless integration
   install_winapps
+  
+  # Generate Remmina connection if both Windows Docker and Remmina are being set up
+  if [[ "${GENERATE_REMMINA_CONNECTIONS:-false}" == "true" || "${INSTALL_REMMINA:-false}" == "true" ]]; then
+    generate_windows_docker_remmina_connection
+  fi
   
   # Start Windows container
   if ! start_windows_container; then

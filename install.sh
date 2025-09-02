@@ -143,7 +143,8 @@ show_menu() {
     "INSTALL_GEMINI_CLI:Gemini CLI"
     
   show_menu_category "Virtual Environments" \
-    "INSTALL_WINDOWS_DOCKER:Windows 11 via Docker (with app integration)"
+    "INSTALL_WINDOWS_DOCKER:Windows 11 via Docker" \
+    "INSTALL_WINAPPS_LAUNCHER:WinApps Launcher (Windows app integration)"
     
   show_menu_category "System Configuration" \
     "SYNC_HYPR_CONFIGS:Sync Hypr configs" \
@@ -215,7 +216,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-35${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}0-36${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
@@ -346,6 +347,7 @@ apply_profile() {
       INSTALL_CODEX_CLI=true
       INSTALL_GEMINI_CLI=true
       INSTALL_WINDOWS_DOCKER=true
+      INSTALL_WINAPPS_LAUNCHER=true
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=true
       INSTALL_AGE=true
@@ -383,6 +385,7 @@ apply_profile() {
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
       INSTALL_WINDOWS_DOCKER=false
+      INSTALL_WINAPPS_LAUNCHER=false
       SYNC_HYPR_CONFIGS=false
       SETUP_SHELL_IMPROVEMENTS=false
       INSTALL_CHEZMOI=false
@@ -423,6 +426,7 @@ apply_profile() {
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
       INSTALL_WINDOWS_DOCKER=false
+      INSTALL_WINAPPS_LAUNCHER=false
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -493,6 +497,7 @@ apply_profile() {
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
       INSTALL_WINDOWS_DOCKER=false
+      INSTALL_WINAPPS_LAUNCHER=false
       SYNC_HYPR_CONFIGS=false
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -531,6 +536,7 @@ apply_profile() {
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
       INSTALL_WINDOWS_DOCKER=false
+      INSTALL_WINAPPS_LAUNCHER=false
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -579,18 +585,19 @@ toggle_option() {
     21) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
     22) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
     23) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
-    24) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    25) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
-    26) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    27) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    28) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    29) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    30) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
-    31) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    32) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
-    33) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
-    34) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    35) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    24) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
+    25) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    26) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    27) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    28) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    29) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    30) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    31) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    32) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    33) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
+    34) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
+    35) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    36) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -985,6 +992,11 @@ execute_installation_modules() {
   # Windows Docker setup
   if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]]; then
     setup_windows_docker_complete
+  fi
+  
+  # WinApps Launcher setup
+  if [[ "${INSTALL_WINAPPS_LAUNCHER:-false}" == "true" ]]; then
+    setup_winapps_launcher_complete
   fi
   
   # Wait for all background jobs to complete
