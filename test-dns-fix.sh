@@ -51,13 +51,39 @@ show_status() {
     fi
     
     echo -e "\n${CYAN}4. Teste de DNS:${NC}"
-    if nslookup google.com >/dev/null 2>&1; then
-        echo -e "   ${GREEN}✓ DNS funcionando${NC}"
+    # Teste com dig (mais comum no Arch) ou host
+    local dns_working=false
+    
+    if command_exists dig; then
+        if dig +short google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando (dig)${NC}"
+            dns_working=true
+        else
+            echo -e "   ${RED}✗ DNS falhando (dig)${NC}"
+        fi
+    elif command_exists host; then
+        if host google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando (host)${NC}"
+            dns_working=true
+        else
+            echo -e "   ${RED}✗ DNS falhando (host)${NC}"
+        fi
+    elif command_exists nslookup; then
+        if nslookup google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando (nslookup)${NC}"
+            dns_working=true
+        else
+            echo -e "   ${RED}✗ DNS falhando (nslookup)${NC}"
+        fi
     else
-        echo -e "   ${RED}✗ DNS falhando${NC}"
+        echo -e "   ${YELLOW}⚠ Nenhum comando DNS encontrado${NC}"
+    fi
+    
+    # Teste com curl como fallback
+    if [[ "$dns_working" == "false" ]]; then
         echo "   Tentando com curl..."
         if curl -s --connect-timeout 5 "https://google.com" >/dev/null 2>&1; then
-            echo -e "   ${YELLOW}⚠ curl funciona, mas nslookup falha${NC}"
+            echo -e "   ${YELLOW}⚠ curl funciona, mas DNS falha${NC}"
         else
             echo -e "   ${RED}✗ curl também falha${NC}"
         fi
@@ -108,13 +134,43 @@ fix_dns() {
         echo -e "   ${GREEN}✓ Modo managed ativado${NC}"
     else
         echo -e "   ${YELLOW}⚠ Ainda não em modo managed${NC}"
+        echo "   Tentando configuração alternativa..."
+        
+        # Forçar configuração manual se systemd-resolved não cooperar
+        sudo systemctl stop systemd-resolved
+        sudo systemctl disable systemd-resolved
+        
+        # Criar resolv.conf estático
+        echo "# DNS estático para correção" | sudo tee /etc/resolv.conf >/dev/null
+        echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf >/dev/null
+        echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
+        echo "nameserver 192.168.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
+        
+        echo "   DNS estático configurado"
     fi
     
     # 6. Testar DNS
     echo "6. Testando DNS..."
-    if nslookup google.com >/dev/null 2>&1; then
-        echo -e "   ${GREEN}✓ DNS funcionando após correção${NC}"
-    else
+    local dns_working=false
+    
+    if command_exists dig; then
+        if dig +short google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando após correção (dig)${NC}"
+            dns_working=true
+        fi
+    elif command_exists host; then
+        if host google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando após correção (host)${NC}"
+            dns_working=true
+        fi
+    elif command_exists nslookup; then
+        if nslookup google.com >/dev/null 2>&1; then
+            echo -e "   ${GREEN}✓ DNS funcionando após correção (nslookup)${NC}"
+            dns_working=true
+        fi
+    fi
+    
+    if [[ "$dns_working" == "false" ]]; then
         echo -e "   ${YELLOW}⚠ DNS ainda com problemas${NC}"
         echo "   Tentando configuração manual..."
         
@@ -125,6 +181,7 @@ fix_dns() {
         echo "# DNS manual para correção" | sudo tee /etc/resolv.conf >/dev/null
         echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf >/dev/null
         echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
+        echo "nameserver 192.168.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
         
         echo "   DNS público configurado temporariamente"
     fi
