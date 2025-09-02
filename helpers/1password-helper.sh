@@ -101,13 +101,23 @@ configure_cli_method() {
             
             # Usar URL do .env se disponível para evitar prompt
             if [[ -n "${ONEPASSWORD_URL:-}" ]]; then
-                echo "Usando URL pré-configurada: ${ONEPASSWORD_URL}"
-                if op account add --address "${ONEPASSWORD_URL}"; then
+                # Clean URL - remove https:// and trailing slashes
+                local clean_url="${ONEPASSWORD_URL}"
+                clean_url="${clean_url#https://}"
+                clean_url="${clean_url#http://}"
+                clean_url="${clean_url%/}"
+                
+                echo "Usando URL pré-configurada: ${clean_url}"
+                echo -n "Digite o email da sua conta: "
+                read -r email
+                
+                if op account add --address "${clean_url}" --email "${email}"; then
                     success "Conta adicionada via Setup Code!"
                     # Fazer login
                     attempt_signin_cli
                 else
                     err "Falha ao adicionar conta"
+                    echo "Verifique se a URL está correta e sua conexão de rede"
                     return 1
                 fi
             else

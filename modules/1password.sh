@@ -324,15 +324,27 @@ configure_1password_cli_direct() {
       
       # Use pre-configured URL if available
       if [[ -n "${ONEPASSWORD_URL:-}" ]]; then
-        echo "Using pre-configured URL: ${ONEPASSWORD_URL}"
-        if op account add --address "${ONEPASSWORD_URL}"; then
+        # Clean URL format - remove https:// and trailing slashes
+        local clean_url="${ONEPASSWORD_URL}"
+        clean_url="${clean_url#https://}"
+        clean_url="${clean_url#http://}"
+        clean_url="${clean_url%/}"
+        
+        echo "Using pre-configured URL: ${clean_url}"
+        echo -n "Enter the email address for your account on ${clean_url}: "
+        read -r email
+        
+        # Let user paste the Setup Code and op will extract the Secret Key
+        if op account add --address "${clean_url}" --email "${email}"; then
           success "Account added via Setup Code!"
           return 0
         else
-          err "Failed to add account"
+          err "Failed to add account. Check your Setup Code and network connection."
+          echo "The URL might be incorrect or your network might be blocking the connection."
           return 1
         fi
       else
+        echo "Enter your 1Password account URL when prompted (e.g. company.1password.com)"
         if op account add; then
           success "Account added via Setup Code!"
           return 0
@@ -351,6 +363,10 @@ configure_1password_cli_direct() {
       # Use URL from .env if available
       local url="${ONEPASSWORD_URL:-}"
       if [[ -n "$url" ]]; then
+        # Clean URL format - remove https:// and trailing slashes
+        url="${url#https://}"
+        url="${url#http://}"
+        url="${url%/}"
         info "URL detected from configuration: $url"
         if ! ask_yes_no "Use this URL?"; then
           echo -n "Enter URL (e.g. company.1password.com): "
@@ -360,6 +376,11 @@ configure_1password_cli_direct() {
         echo -n "Account URL (e.g. company.1password.com): "
         read -r url
       fi
+      
+      # Clean the URL again in case user entered with protocol
+      url="${url#https://}"
+      url="${url#http://}"
+      url="${url%/}"
       
       # Use email from .env if available
       local email="${ONEPASSWORD_EMAIL:-}"
@@ -491,6 +512,10 @@ setup_1password_complete() {
               fi
             else
               err "Direct CLI configuration failed"
+              if ! ask_yes_no "Try a different configuration method?"; then
+                return 1
+              fi
+            fi
               if ! ask_yes_no "Try a different configuration method?"; then
                 return 1
               fi
@@ -1002,10 +1027,27 @@ setup_ssh_keys_from_1password() {
   info "Configuring SSH keys from 1Password..."
   
   # Verify 1Password CLI is authenticated
-  if ! op account list >/dev/null 2>&1; then
-    err "1Password CLI not authenticated. Cannot sync SSH keys."
-    info "Please complete 1Password configuration first."
+  local account_check
+  account_check=$(op account list 2>&1)
+  local account_exit=$?
+  
+  if [[ $account_exit -ne 0 ]] || [[ "$account_check" == *"No accounts configured"* ]] || [[ -z "$account_check" ]]; then
+    err "1Password CLI not configured or authenticated."
+    echo
+    echo "The SSH key sync requires 1Password to be configured first."
+    echo "Please run: ./install.sh --1pass"
+    echo "Or use the helper: ./helpers/1password-helper.sh"
+    echo
     return 1
+  fi
+  
+  # Also check if we can actually access vaults (authenticated)
+  if ! op vault list >/dev/null 2>&1; then
+    info "1Password needs authentication. Attempting to sign in..."
+    if ! signin_1password_cli; then
+      err "Failed to authenticate with 1Password"
+      return 1
+    fi
   fi
   
   # Get SSH key name from configuration (collected in confirmation step)
