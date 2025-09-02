@@ -710,6 +710,187 @@ install_dell_utilities() {
   CONFIGURED_RUNTIMES+=("fwupd firmware updater")
 }
 
+# Create shutdown hook to prevent hanging
+create_dell_xps_shutdown_hook() {
+  info "Creating Dell XPS shutdown hook to prevent freezes..."
+  
+  local hook_file="/etc/systemd/system-shutdown/dell-xps-cleanup.shutdown"
+  
+  if is_debug_mode; then
+    info "[DEBUG] Would create shutdown hook at $hook_file"
+    return 0
+  fi
+  
+  # Create shutdown directory if it doesn't exist
+  sudo mkdir -p "/etc/systemd/system-shutdown"
+  
+  # Create shutdown hook script
+  sudo tee "$hook_file" > /dev/null << 'EOF'
+#!/bin/bash
+# Dell XPS shutdown cleanup hook
+# Prevents shutdown hangs by properly stopping services and unloading modules
+
+# Only run on shutdown/reboot
+if [[ "$1" != "halt" ]] && [[ "$1" != "poweroff" ]] && [[ "$1" != "reboot" ]]; then
+    exit 0
+fi
+
+echo "Dell XPS shutdown cleanup starting..."
+
+# Stop TLP services gracefully
+systemctl --no-block stop tlp.service 2>/dev/null || true
+systemctl --no-block stop thermald.service 2>/dev/null || true
+systemctl --no-block stop fwupd.service 2>/dev/null || true
+
+# Kill any hanging processes
+pkill -f "tlp" 2>/dev/null || true
+pkill -f "thermald" 2>/dev/null || true
+pkill -f "fwupd" 2>/dev/null || true
+
+# Unload problematic kernel modules
+modprobe -r ipu6_drivers 2>/dev/null || true
+modprobe -r intel_ipu6_isys 2>/dev/null || true
+modprobe -r intel_ipu6_psys 2>/dev/null || true
+
+# Disable USB devices that might hang
+for usb_device in /sys/bus/usb/devices/*/power/control; do
+    [[ -w "$usb_device" ]] && echo "on" > "$usb_device" 2>/dev/null || true
+done
+
+# Disable runtime PM for all PCI devices to prevent hangs
+for pci_device in /sys/bus/pci/devices/*/power/control; do
+    [[ -w "$pci_device" ]] && echo "on" > "$pci_device" 2>/dev/null || true
+done
+
+# Force sync filesystems
+sync
+
+echo "Dell XPS shutdown cleanup completed"
+exit 0
+EOF
+
+  # Make executable
+  sudo chmod +x "$hook_file"
+  
+  success "Dell XPS shutdown hook created: $hook_file"
+  info "This hook will run during shutdown to prevent hanging"
+  
+  return 0
+}
+
+# Create systemd service to handle shutdown more gracefully
+create_dell_xps_shutdown_service() {
+  info "Creating Dell XPS graceful shutdown service..."
+  
+  local service_file="/etc/systemd/system/dell-xps-shutdown.service"
+  
+  if is_debug_mode; then
+    info "[DEBUG] Would create shutdown service at $service_file"
+    return 0
+  fi
+  
+  # Create shutdown service
+  sudo tee "$service_file" > /dev/null << 'EOF'
+[Unit]
+Description=Dell XPS Graceful Shutdown Handler
+DefaultDependencies=false
+Before=shutdown.target reboot.target halt.target
+Requires=-.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStop=/bin/bash -c '
+echo "Dell XPS graceful shutdown starting...";
+
+# Stop services with timeout
+timeout 5 systemctl stop tlp.service 2>/dev/null || true;
+timeout 5 systemctl stop thermald.service 2>/dev/null || true;
+timeout 5 systemctl stop fwupd.service 2>/dev/null || true;
+
+# Kill any remaining processes
+pkill -TERM -f "tlp|thermald|fwupd" 2>/dev/null || true;
+sleep 2;
+pkill -KILL -f "tlp|thermald|fwupd" 2>/dev/null || true;
+
+# Unload modules
+modprobe -r ipu6_drivers 2>/dev/null || true;
+modprobe -r intel_ipu6_isys 2>/dev/null || true;
+modprobe -r intel_ipu6_psys 2>/dev/null || true;
+
+# Add specific Dell XPS 13 Plus shutdown workarounds
+echo "Dell XPS graceful shutdown completed";
+'
+TimeoutStopSec=10
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Enable the service
+  sudo systemctl daemon-reload
+  sudo systemctl enable dell-xps-shutdown.service
+  
+  success "Dell XPS graceful shutdown service created and enabled"
+  
+  return 0
+}
+
+# Add kernel parameters to prevent XPS shutdown hangs
+configure_dell_xps_kernel_params() {
+  info "Configuring kernel parameters to prevent Dell XPS shutdown hangs..."
+  
+  local grub_config="/etc/default/grub"
+  local backup_file="${grub_config}.backup.$(date +%Y%m%d_%H%M%S)"
+  
+  if [[ ! -f "$grub_config" ]]; then
+    warn "GRUB configuration not found: $grub_config"
+    return 1
+  fi
+  
+  if is_debug_mode; then
+    info "[DEBUG] Would add kernel parameters to prevent shutdown hangs"
+    return 0
+  fi
+  
+  # Backup GRUB config
+  sudo cp "$grub_config" "$backup_file"
+  info "GRUB config backed up to: $backup_file"
+  
+  # Kernel parameters to add
+  local kernel_params="reboot=acpi,force acpi_sleep=s3_bios,s3_mode button.lid_init_state=open"
+  
+  # Check if parameters already exist
+  if grep -q "reboot=acpi,force" "$grub_config"; then
+    info "Dell XPS kernel parameters already configured"
+    return 0
+  fi
+  
+  # Add parameters to GRUB_CMDLINE_LINUX_DEFAULT
+  if grep -q "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_config"; then
+    # Replace existing line
+    sudo sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 $kernel_params\"/" "$grub_config"
+  else
+    # Add new line
+    echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$kernel_params\"" | sudo tee -a "$grub_config" > /dev/null
+  fi
+  
+  # Update GRUB
+  info "Updating GRUB configuration..."
+  if command -v grub-mkconfig >/dev/null 2>&1; then
+    sudo grub-mkconfig -o /boot/grub/grub.cfg
+    success "GRUB configuration updated"
+  else
+    warn "grub-mkconfig not found, please update GRUB manually"
+  fi
+  
+  success "Dell XPS kernel parameters configured"
+  info "Added parameters: $kernel_params"
+  
+  return 0
+}
+
 # Main Dell XPS setup function
 setup_dell_xps_9320_complete() {
   if [[ "${SETUP_DELL_XPS_9320:-false}" != "true" ]]; then
@@ -739,6 +920,11 @@ setup_dell_xps_9320_complete() {
   # Dell utilities
   install_dell_utilities
   
+  # Create shutdown hooks to prevent hanging (IMPORTANT FIX)
+  create_dell_xps_shutdown_hook
+  create_dell_xps_shutdown_service
+  configure_dell_xps_kernel_params
+  
   success "Dell XPS 13 Plus setup completed!"
   
   # Show post-installation info
@@ -767,8 +953,13 @@ show_dell_xps_post_install_info() {
     echo "• Toggle with: Alt+Shift"
   fi
   
+  echo -e "\n${CYAN}Shutdown Fix:${NC}"
+  echo "• Shutdown hooks installed to prevent freezing"
+  echo "• Kernel parameters added for reliable reboot"
+  echo "• Services will stop gracefully during shutdown"
+  
   echo -e "\n${CYAN}Next Steps:${NC}"
-  echo "• Reboot to activate all drivers"
+  echo "• Reboot to activate all drivers and kernel parameters"
   echo "• Check webcam: cheese"
   echo "• Check TLP status: sudo tlp-stat"
   echo "• Update firmware: sudo fwupdmgr refresh && sudo fwupdmgr update"
@@ -784,6 +975,7 @@ export -f check_package_available check_aur_available install_tlp_manual install
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
 export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services
+export -f create_dell_xps_shutdown_hook create_dell_xps_shutdown_service configure_dell_xps_kernel_params
 
 # Create TLP systemd service manually
 create_tlp_service() {
