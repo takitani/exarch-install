@@ -465,21 +465,68 @@ setup_1password_complete() {
   local status
   status=$(check_1password_status)
   
+  # Check if user wants to reconfigure even if already set up
+  local force_reconfig=false
+  if [[ "${ONEPASSWORD_FORCE_RECONFIG:-false}" == "true" ]]; then
+    force_reconfig=true
+  fi
+  
   case "$status" in
     "authenticated")
-      info "1Password CLI already configured and authenticated"
-      ;;
-    "configured_not_logged_in")
-      if ! signin_1password_cli; then
-        err "Failed to authenticate with 1Password"
-        return 1
+      if [[ "$force_reconfig" == "true" ]]; then
+        info "1Password CLI is already configured, but reconfiguration requested."
+        status="not_configured"  # Force showing menu
+      else
+        info "1Password CLI already configured and authenticated"
+        # Offer option to reconfigure
+        echo
+        if ask_yes_no "1Password is already configured. Do you want to reconfigure?"; then
+          status="not_configured"  # Force showing menu
+        else
+          return 0  # Skip reconfiguration
+        fi
       fi
       ;;
-    "not_configured")
-      info "1Password CLI not configured."
+    "configured_not_logged_in")
+      info "1Password CLI configured but not logged in."
+      echo
+      echo "Options:"
+      echo "1) Sign in with existing configuration"
+      echo "2) Reconfigure 1Password"
+      echo "3) Skip"
+      echo
+      echo -n "Choose (1/2/3): "
+      read -r signin_choice
       
-      # Loop until valid configuration is chosen
-      while true; do
+      case "$signin_choice" in
+        1)
+          if ! signin_1password_cli; then
+            err "Failed to authenticate with 1Password"
+            return 1
+          fi
+          return 0
+          ;;
+        2)
+          status="not_configured"  # Force showing menu
+          ;;
+        3)
+          info "Skipping 1Password configuration"
+          return 0
+          ;;
+        *)
+          err "Invalid choice"
+          return 1
+          ;;
+      esac
+      ;;
+  esac
+  
+  # Show configuration menu for not_configured status
+  if [[ "$status" == "not_configured" ]]; then
+    info "1Password CLI configuration needed."
+    
+    # Loop until valid configuration is chosen
+    while true; do
         echo
         echo "Choose configuration method:"
         echo -e "1) ${BOLD}Mobile + Desktop Flow${NC} (easiest with phone)"
@@ -519,10 +566,6 @@ setup_1password_complete() {
               fi
             else
               err "Direct CLI configuration failed"
-              if ! ask_yes_no "Try a different configuration method?"; then
-                return 1
-              fi
-            fi
               if ! ask_yes_no "Try a different configuration method?"; then
                 return 1
               fi
@@ -593,8 +636,7 @@ setup_1password_complete() {
       done
       
       success "1Password configured and authenticated successfully!"
-      ;;
-  esac
+  fi
   
   # Generate .pgpass file
   generate_pgpass_file
