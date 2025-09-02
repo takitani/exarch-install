@@ -75,6 +75,7 @@ source "$SCRIPT_DIR/modules/remmina.sh"
 source "$SCRIPT_DIR/modules/pipewire-camera.sh"
 source "$SCRIPT_DIR/modules/espanso.sh"
 source "$SCRIPT_DIR/modules/gnome-keyring.sh"
+source "$SCRIPT_DIR/modules/keyboard-layout.sh"
 source "$SCRIPT_DIR/modules/windows-docker.sh"
 
 # ======================================
@@ -156,7 +157,8 @@ show_menu() {
     "SETUP_SSH_KEYS:SSH keys sync via 1Password" \
     "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password" \
     "FIX_CURSOR_INPUT_METHOD:Fix Cursor input method (BR keyboard support)" \
-    "SETUP_GNOME_KEYRING:Setup Gnome Keyring (no Chrome password prompts)"
+    "SETUP_GNOME_KEYRING:Setup Gnome Keyring (no Chrome password prompts)" \
+    "SETUP_PTBR_KEYBOARD_LAYOUT:Configure US keyboard with PT-BR layout"
     
   # Only show Dell XPS category if detected or forced
   local hw_info
@@ -216,7 +218,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-36${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}0-37${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
@@ -436,6 +438,7 @@ apply_profile() {
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=false
       FIX_CURSOR_INPUT_METHOD=false
+      SETUP_PTBR_KEYBOARD_LAYOUT=true
       ;;
     "development")
       INSTALL_GOOGLE_CHROME=true
@@ -470,6 +473,7 @@ apply_profile() {
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=true
       FIX_CURSOR_INPUT_METHOD=true
+      SETUP_PTBR_KEYBOARD_LAYOUT=true
       ;;
     "minimal")
       # Deselect all options
@@ -596,8 +600,9 @@ toggle_option() {
     32) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
     33) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
     34) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
-    35) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    36) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    35) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
+    36) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    37) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -989,6 +994,11 @@ execute_installation_modules() {
     setup_gnome_keyring
   fi
   
+  # PT-BR Keyboard Layout setup
+  if [[ "${SETUP_PTBR_KEYBOARD_LAYOUT:-false}" == "true" ]]; then
+    setup_ptbr_keyboard_layout
+  fi
+  
   # Windows Docker setup
   if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]]; then
     setup_windows_docker_complete
@@ -1160,6 +1170,10 @@ show_final_report() {
   
   if [[ "${SETUP_GNOME_KEYRING:-false}" == "true" ]]; then
     echo "• Gnome Keyring configured - Chrome will no longer ask for password"
+  fi
+  
+  if [[ "${SETUP_PTBR_KEYBOARD_LAYOUT:-false}" == "true" ]]; then
+    echo "• PT-BR keyboard layout configured for US keyboards"
   fi
   
   echo "• Log files saved to: $LOG_DIR"
