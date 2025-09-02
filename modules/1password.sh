@@ -680,11 +680,22 @@ setup_1password_complete() {
               if [[ -n "$email" ]]; then
                 echo "Debug: About to run: op account add --address '$address' --email '$email'"
                 echo "Debug: Testing connectivity to $address..."
+                
+                # Test HTTPS connectivity 
                 if curl -I -s --connect-timeout 10 "https://$address" >/dev/null 2>&1; then
                   info "✅ Connectivity to $address OK"
                 else
                   warn "⚠️ Connectivity test to $address failed - but will try anyway"
                 fi
+                
+                # Additional debugging - test what op can see
+                echo "Debug: Testing op CLI connectivity..."
+                echo "Debug: op version: $(op --version 2>/dev/null || echo 'version check failed')"
+                echo "Debug: DNS resolution test:"
+                nslookup "$address" 2>/dev/null | grep -A2 "Name:" | head -3 || echo "nslookup failed"
+                
+                # Test with verbose op command
+                echo "Debug: Running op with detailed error output..."
                 
                 if op account add --address "$address" --email "$email"; then
                   if signin_1password_cli; then
@@ -705,21 +716,18 @@ setup_1password_complete() {
                   echo "  • Check network connectivity from this machine"
                   echo "  • Try manually: curl -I https://$address"
                   echo
+                  echo "Advanced debugging:"
+                  echo "  • Test telnet: telnet $address 443"
+                  echo "  • Test openssl: openssl s_client -connect $address:443 -servername $address < /dev/null"
+                  echo "  • Check if corporate firewall blocks 1Password CLI specifically"
+                  echo
                   
-                  # Offer alternative URLs to try
-                  if [[ "$address" == "exatodigital.1password.com" ]]; then
-                    if ask_yes_no "Try with 'exatodigitalteam.1password.com' instead?"; then
-                      address="exatodigitalteam.1password.com"
-                      info "Retrying with: $address"
-                      if op account add --address "$address" --email "$email"; then
-                        if signin_1password_cli; then
-                          success "Basic manual configuration completed successfully!"
-                          break
-                        fi
-                      else
-                        err "Also failed with alternative URL"
-                      fi
-                    fi
+                  # Test if it's a certificate issue
+                  echo "Testing SSL certificate..."
+                  if openssl s_client -connect "$address:443" -servername "$address" < /dev/null 2>/dev/null | grep -q "Verify return code: 0"; then
+                    info "✅ SSL certificate is valid"
+                  else
+                    warn "⚠️ SSL certificate issue detected"
                   fi
                   
                   if ! ask_yes_no "Try a different configuration method?"; then
