@@ -303,8 +303,9 @@ configure_1password_cli_direct() {
   echo "1) Setup Code from Emergency Kit"
   echo "2) Complete data (URL, email, Secret Key)"
   echo "3) I don't have any of these"
+  echo "4) Cancel configuration"
   echo
-  echo -n "Choose (1/2/3): "
+  echo -n "Choose (1/2/3/4): "
   read -r config_type
   
   case "$config_type" in
@@ -424,7 +425,13 @@ configure_1password_cli_direct() {
       echo "• PDF downloaded during signup"
       echo "• Account settings at 1password.com"
       echo
-      echo "Configure first by running: ./configure.sh"
+      echo "Configure first by running: ./helpers/1password-helper.sh"
+      return 1
+      ;;
+      
+    4)
+      echo
+      info "Cancelling 1Password configuration"
       return 1
       ;;
   esac
@@ -1015,7 +1022,7 @@ export -f install_1password_cli detect_1password_desktop install_1password_deskt
 export -f open_1password_desktop check_1password_status signin_1password_cli
 export -f configure_1password_mobile_desktop configure_1password_cli_direct
 export -f setup_1password_complete process_database_item generate_pgpass_file
-export -f test_1password_mode
+export -f test_1password_mode setup_ssh_keys_from_1password
 
 # SSH Key Management from 1Password
 setup_ssh_keys_from_1password() {

@@ -306,14 +306,14 @@ process_vault_servers() {
   # Search in multiple categories since RDP connections can be in various places
   local server_list_server server_list_login server_list_database filtered_login filtered_database
   
-  # Get items from Server category
-  server_list_server=$(op item list --vault "$vault" --categories Server --format json 2>/dev/null || echo "[]")
+  # Get items from Server category - use timeout and echo "n" to prevent interactive prompts
+  server_list_server=$(echo "n" | timeout 5 op item list --vault "$vault" --categories Server --format json 2>/dev/null || echo "[]")
   
   # Get items from Login category
-  server_list_login=$(op item list --vault "$vault" --categories Login --format json 2>/dev/null || echo "[]")
+  server_list_login=$(echo "n" | timeout 5 op item list --vault "$vault" --categories Login --format json 2>/dev/null || echo "[]")
   
   # Get items from Database category (sometimes servers are stored here)
-  server_list_database=$(op item list --vault "$vault" --categories Database --format json 2>/dev/null || echo "[]")
+  server_list_database=$(echo "n" | timeout 5 op item list --vault "$vault" --categories Database --format json 2>/dev/null || echo "[]")
   
   # Filter Login items to only those that look like server connections
   filtered_login=$(echo "$server_list_login" | jq '[.[] | select(.title | test("EC2|RDP|Remote|Server|VM|VPS|Instance|Host|AWS|Azure|GCP|Cloud|Web|App|API|Backend|Frontend|Prod|Dev|UAT|Test|Staging"; "i"))]' 2>/dev/null || echo "[]")
@@ -486,9 +486,24 @@ setup_remmina_connections_complete() {
     return 1
   fi
   
-  # Test 1Password authentication
-  if ! op account list >/dev/null 2>&1; then
-    err "1Password CLI not authenticated. Please sign in first."
+  # Test 1Password authentication - check if actually configured with accounts
+  local account_check
+  account_check=$(timeout 5 op account list 2>&1)
+  local account_exit=$?
+  
+  if [[ $account_exit -ne 0 ]] || [[ "$account_check" == *"No accounts configured"* ]] || [[ -z "$account_check" ]] || ! echo "$account_check" | grep -q "@"; then
+    err "1Password CLI not configured or authenticated."
+    echo "Please configure 1Password first by running:"
+    echo "  ./install.sh --1pass"
+    echo "Or:"
+    echo "  ./helpers/1password-helper.sh"
+    return 1
+  fi
+  
+  # Check if we can actually access vaults
+  if ! timeout 5 op vault list >/dev/null 2>&1; then
+    err "1Password CLI needs authentication."
+    echo "Please sign in first using: eval \$(op signin)"
     return 1
   fi
   
