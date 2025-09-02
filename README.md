@@ -27,12 +27,41 @@ Este script foi projetado especificamente para rodar **após** a instalação do
 1. **Baixe o ISO do Omarchy**: https://omarchy.org/
 2. **Instale o sistema** seguindo as instruções da distribuição
 3. **Reinicie** e faça login no seu novo sistema Omarchy
-4. **Clone este repositório** e execute o script
+4. **Execute o script** (veja instruções abaixo)
 
 > ⚠️ **IMPORTANTE**: Este script assume que você já tem o Omarchy Linux instalado com:
 > - `yay` (gerenciador AUR - padrão no Omarchy)
 > - `mise` (gerenciador de ambientes - padrão no Omarchy)
 > - `hyprland` (gerenciador de janelas - padrão no Omarchy)
+
+## 🚀 Execução Rápida
+
+### Executar diretamente sem clonar (recomendado)
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/takitani/exarch-install/master/install.sh)
+```
+
+### Ou com wget
+```bash
+bash <(wget -qO- https://raw.githubusercontent.com/takitani/exarch-install/master/install.sh)
+```
+
+### Executar com flags específicas
+```bash
+# Modo debug (simula sem instalar)
+bash <(curl -sSL https://raw.githubusercontent.com/takitani/exarch-install/master/install.sh) --debug
+
+# Forçar modo Dell XPS
+bash <(curl -sSL https://raw.githubusercontent.com/takitani/exarch-install/master/install.sh) --xps
+```
+
+### Método tradicional (clonando repositório)
+```bash
+git clone https://github.com/takitani/exarch-install.git
+cd exarch-install
+chmod +x install.sh
+./install.sh
+```
 
 ## post-omarchy-setup.sh
 
