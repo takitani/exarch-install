@@ -62,11 +62,31 @@ EOF
     warn "hyprland.conf not found - please add manually: source = ~/.config/hypr/cedilla-remap.conf"
   fi
   
-  # Create cursor wrapper script
-  local cursor_script="${HOME}/cursor-cedilla.sh"
-  cat > "$cursor_script" << 'EOF'
+  # Modify existing Cursor launcher to include cedilla fix
+  info "Modifying Cursor launcher for cedilla support..."
+  
+  # Find the Cursor desktop file
+  local cursor_desktop=""
+  local possible_locations=(
+    "/usr/share/applications/cursor.desktop"
+    "${HOME}/.local/share/applications/cursor.desktop"
+    "/usr/share/applications/cursor-url-handler.desktop"
+  )
+  
+  for location in "${possible_locations[@]}"; do
+    if [[ -f "$location" ]]; then
+      cursor_desktop="$location"
+      break
+    fi
+  done
+  
+  if [[ -z "$cursor_desktop" ]]; then
+    warn "Cursor desktop file not found, creating wrapper script instead"
+    # Fallback: create wrapper script
+    local cursor_wrapper="/usr/local/bin/cursor-cedilla"
+    sudo tee "$cursor_wrapper" > /dev/null << 'EOF'
 #!/bin/bash
-# Cursor IDE with cedilla fix for Brazilian keyboards
+# Cursor with cedilla fix for Brazilian keyboards
 
 # Configure environment for pt_BR
 export LANG=pt_BR.UTF-8
@@ -89,34 +109,43 @@ unset QT_IM_MODULE
 unset XMODIFIERS
 
 # Run Cursor forcing X11 backend
-GDK_BACKEND=x11 cursor --ozone-platform=x11 "$@"
+exec env GDK_BACKEND=x11 /usr/share/cursor/cursor --ozone-platform=x11 "$@"
 EOF
-  chmod +x "$cursor_script"
-  success "Created cursor-cedilla.sh wrapper script"
-  
-  # Create desktop entry for the wrapper
-  local desktop_file="${HOME}/.local/share/applications/cursor-cedilla.desktop"
-  mkdir -p "${HOME}/.local/share/applications"
-  cat > "$desktop_file" << EOF
-[Desktop Entry]
-Name=Cursor (Cedilla)
-Comment=Cursor IDE with Brazilian keyboard cedilla fix
-Exec=${cursor_script} %F
-Icon=cursor
-Type=Application
-Categories=Development;IDE;
-Terminal=false
-StartupNotify=true
-MimeType=text/plain;
-EOF
-  success "Created desktop entry for Cursor with cedilla fix"
+    sudo chmod +x "$cursor_wrapper"
+    
+    # Replace cursor binary with wrapper
+    if [[ -f "/usr/bin/cursor" ]]; then
+      sudo mv /usr/bin/cursor /usr/bin/cursor.original 2>/dev/null || true
+      sudo ln -sf "$cursor_wrapper" /usr/bin/cursor
+      success "Replaced cursor binary with cedilla-enabled wrapper"
+    fi
+  else
+    # Backup original desktop file
+    sudo cp "$cursor_desktop" "${cursor_desktop}.backup" 2>/dev/null || true
+    
+    # Modify the Exec line to include environment variables
+    local temp_desktop="/tmp/cursor.desktop.$$"
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^Exec= ]]; then
+        # Extract the original command
+        local original_cmd="${line#Exec=}"
+        # Create new Exec line with environment variables
+        echo "Exec=env LANG=pt_BR.UTF-8 LC_ALL=pt_BR.UTF-8 LC_CTYPE=pt_BR.UTF-8 GTK_IM_MODULE= QT_IM_MODULE= XMODIFIERS= GDK_BACKEND=x11 ${original_cmd/cursor/cursor --ozone-platform=x11}"
+      else
+        echo "$line"
+      fi
+    done < "$cursor_desktop" > "$temp_desktop"
+    
+    # Replace the original file
+    sudo mv "$temp_desktop" "$cursor_desktop"
+    sudo chmod 644 "$cursor_desktop"
+    success "Modified Cursor desktop file for cedilla support"
+  fi
   
   # Show instructions
   echo
   info "Cedilla fix for Cursor has been configured!"
-  info "You can now run Cursor with cedilla support using:"
-  echo "  ${cursor_script}"
-  info "Or use the 'Cursor (Cedilla)' desktop entry"
+  info "The original Cursor launcher has been modified to support cedilla"
   echo
   info "Note: Close all Cursor instances and restart for changes to take effect"
 }
@@ -391,7 +420,7 @@ install_development_tools() {
   
   # Text expansion
   if [[ "${INSTALL_ESPANSO:-true}" == "true" ]]; then
-    pac espanso
+    setup_espanso
   fi
   
   success "Development tools installation initiated"

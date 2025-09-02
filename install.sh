@@ -73,6 +73,7 @@ source "$SCRIPT_DIR/modules/development.sh"
 source "$SCRIPT_DIR/modules/dell-xps.sh"
 source "$SCRIPT_DIR/modules/remmina.sh"
 source "$SCRIPT_DIR/modules/pipewire-camera.sh"
+source "$SCRIPT_DIR/modules/espanso.sh"
 
 # ======================================
 # MENU SYSTEM
