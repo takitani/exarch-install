@@ -783,7 +783,7 @@ export -f install_dell_xps_power_management configure_tlp_dell_xps
 export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
-export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config
+export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services
 
 # Create TLP systemd service manually
 create_tlp_service() {
@@ -955,4 +955,53 @@ EOF
     err "Failed to create TLP configuration file"
     return 1
   fi
+}
+
+# Cleanup function to ensure clean shutdown
+cleanup_dell_xps_services() {
+  info "Cleaning up Dell XPS services for clean shutdown..."
+  
+  # Stop TLP services
+  if systemctl is-active tlp >/dev/null 2>&1; then
+    info "Stopping TLP service..."
+    sudo systemctl stop tlp
+  fi
+  
+  if systemctl is-active thermald >/dev/null 2>&1; then
+    info "Stopping thermald service..."
+    sudo systemctl stop thermald
+  fi
+  
+  if systemctl is-active fwupd >/dev/null 2>&1; then
+    info "Stopping fwupd service..."
+    sudo systemctl stop fwupd
+  fi
+  
+  # Unload IPU6 modules if loaded
+  local modules=("ipu6_drivers" "intel_ipu6_isys" "intel_ipu6_psys")
+  for module in "${modules[@]}"; do
+    if lsmod | grep -q "^$module "; then
+      info "Unloading module: $module"
+      sudo modprobe -r "$module" 2>/dev/null || warn "Failed to unload $module"
+    fi
+  done
+  
+  # Kill any remaining processes
+  local processes=("tlp" "thermald" "fwupd" "ipu6")
+  for proc in "${processes[@]}"; do
+    local pids
+    pids=$(pgrep "$proc" 2>/dev/null)
+    if [[ -n "$pids" ]]; then
+      info "Terminating $proc processes: $pids"
+      echo "$pids" | xargs -r sudo kill -TERM 2>/dev/null
+      sleep 1
+      echo "$pids" | xargs -r sudo kill -KILL 2>/dev/null
+    fi
+  done
+  
+  # Sync filesystems
+  info "Syncing filesystems..."
+  sudo sync
+  
+  success "Cleanup completed - safe to reboot"
 }
