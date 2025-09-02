@@ -74,6 +74,7 @@ source "$SCRIPT_DIR/modules/dell-xps.sh"
 source "$SCRIPT_DIR/modules/remmina.sh"
 source "$SCRIPT_DIR/modules/pipewire-camera.sh"
 source "$SCRIPT_DIR/modules/espanso.sh"
+source "$SCRIPT_DIR/modules/gnome-keyring.sh"
 
 # ======================================
 # MENU SYSTEM
@@ -149,7 +150,8 @@ show_menu() {
     "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
     "SETUP_SSH_KEYS:SSH keys sync via 1Password" \
     "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password" \
-    "FIX_CURSOR_INPUT_METHOD:Fix Cursor input method (BR keyboard support)"
+    "FIX_CURSOR_INPUT_METHOD:Fix Cursor input method (BR keyboard support)" \
+    "SETUP_GNOME_KEYRING:Setup Gnome Keyring (no Chrome password prompts)"
     
   # Only show Dell XPS category if detected or forced
   local hw_info
@@ -209,7 +211,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-33${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}0-34${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
@@ -344,6 +346,7 @@ apply_profile() {
       SETUP_DUAL_KEYBOARD=true
       GENERATE_REMMINA_CONNECTIONS=true
       FIX_CURSOR_INPUT_METHOD=true
+      SETUP_GNOME_KEYRING=false
       ;;
     "none")
       # Disable all options
@@ -381,6 +384,7 @@ apply_profile() {
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=false
       FIX_CURSOR_INPUT_METHOD=false
+      SETUP_GNOME_KEYRING=false
       echo -e "${RED}✗ All options disabled - select items individually${NC}"
       ;;
     "recommended")
@@ -570,8 +574,9 @@ toggle_option() {
     29) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
     30) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
     31) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
-    32) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    33) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    32) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
+    33) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    34) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -958,6 +963,11 @@ execute_installation_modules() {
     setup_shell_improvements
   fi
   
+  # Gnome Keyring setup
+  if [[ "${SETUP_GNOME_KEYRING:-false}" == "true" ]]; then
+    setup_gnome_keyring
+  fi
+  
   # Wait for all background jobs to complete
   wait_for_background_jobs
   
@@ -1115,6 +1125,10 @@ show_final_report() {
   
   if [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]; then
     echo "• Remmina RDP connections have been generated from 1Password"
+  fi
+  
+  if [[ "${SETUP_GNOME_KEYRING:-false}" == "true" ]]; then
+    echo "• Gnome Keyring configured - Chrome will no longer ask for password"
   fi
   
   echo "• Log files saved to: $LOG_DIR"

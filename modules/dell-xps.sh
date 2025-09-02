@@ -6,6 +6,113 @@
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh"
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/hardware-detection.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/hardware-detection.sh"
 
+# Function to check if package is available in official repos
+check_package_available() {
+  local pkg="$1"
+  pacman -Ss "^$pkg$" >/dev/null 2>&1
+}
+
+# Function to check if package is available in AUR
+check_aur_available() {
+  local pkg="$1"
+  if command -v yay >/dev/null 2>&1; then
+    yay -Ss "^$pkg$" >/dev/null 2>&1
+  else
+    return 1
+  fi
+}
+
+# Manual TLP installation from source
+install_tlp_manual() {
+  info "Installing TLP from source..."
+  
+  local tmpdir_tlp
+  tmpdir_tlp=$(mktemp -d)
+  
+  pushd "$tmpdir_tlp" > /dev/null || return 1
+  
+  # Clone TLP repository
+  if ! git clone https://github.com/linrunner/TLP.git .; then
+    err "Failed to clone TLP repository"
+    popd > /dev/null
+    rm -rf "$tmpdir_tlp"
+    return 1
+  fi
+    
+  # Check dependencies
+  local deps=("make" "gcc" "pkg-config" "libpciaccess" "libnl" "libudev-zero")
+  local missing_deps=()
+  
+  for dep in "${deps[@]}"; do
+    if ! pacman -Q "$dep" >/dev/null 2>&1; then
+      missing_deps+=("$dep")
+    fi
+  done
+  
+  if [[ ${#missing_deps[@]} -gt 0 ]]; then
+    info "Installing missing dependencies: ${missing_deps[*]}"
+    for dep in "${missing_deps[@]}"; do
+      pac "$dep" || warn "Failed to install dependency: $dep"
+    done
+  fi
+  
+  # Build and install
+  if make && sudo make install; then
+    success "TLP installed from source"
+    popd > /dev/null
+    rm -rf "$tmpdir_tlp"
+    return 0
+  else
+    err "Failed to build/install TLP from source"
+    popd > /dev/null
+    rm -rf "$tmpdir_tlp"
+    return 1
+  fi
+}
+
+# Manual TLP RDW installation from source
+install_tlp_rdw_manual() {
+  info "Installing TLP RDW from source..."
+  
+  local tmpdir_rdw
+  tmpdir_rdw=$(mktemp -d)
+  
+  pushd "$tmpdir_rdw" > /dev/null || return 1
+  
+  # Clone TLP repository
+  if ! git clone https://github.com/linrunner/TLP.git .; then
+    err "Failed to clone TLP repository for RDW"
+    popd > /dev/null
+    rm -rf "$tmpdir_rdw"
+    return 1
+  fi
+  
+  # Check if rdw directory exists
+  if [[ ! -d "rdw" ]]; then
+    err "TLP RDW source not found in repository"
+    popd > /dev/null
+    rm -rf "$tmpdir_rdw"
+    return 1
+  fi
+  
+  # Install RDW
+  pushd "rdw" > /dev/null || return 1
+  
+  if make && sudo make install; then
+    success "TLP RDW installed from source"
+    popd > /dev/null
+    popd > /dev/null
+    rm -rf "$tmpdir_rdw"
+    return 0
+  else
+    err "Failed to build/install TLP RDW from source"
+    popd > /dev/null
+    popd > /dev/null
+    rm -rf "$tmpdir_rdw"
+    return 1
+  fi
+}
+
 # Install Dell XPS 13 Plus webcam drivers
 setup_dell_xps_9320_webcam() {
   if ! is_dell_xps_9320; then
@@ -273,12 +380,146 @@ install_dell_xps_power_management() {
   
   info "Installing power management tools for Dell XPS..."
   
-  # TLP for advanced power management
-  pac tlp
-  pac tlp-rdw  # Radio device wizard
+  # Function to install TLP with fallbacks
+  install_tlp_with_fallbacks() {
+    local tlp_installed=false
+    local tlp_rdw_installed=false
+    
+    info "Installing TLP (Linux Advanced Power Management)..."
+    
+    # Method 1: Try official repository first
+    if check_package_available "tlp"; then
+      info "TLP available in official repository, installing..."
+      if pac tlp; then
+        tlp_installed=true
+        success "TLP installed from official repository"
+      else
+        warn "Failed to install TLP from official repository"
+      fi
+    fi
+    
+    # Method 2: Try AUR if official repo failed
+    if [[ "$tlp_installed" == false ]] && check_aur_available "tlp"; then
+      info "TLP available in AUR, installing via yay..."
+      if aur tlp; then
+        tlp_installed=true
+        success "TLP installed from AUR"
+      else
+        warn "Failed to install TLP from AUR"
+      fi
+    fi
+    
+    # Method 3: Try alternative package names
+    if [[ "$tlp_installed" == false ]]; then
+      info "Trying alternative TLP package names..."
+      
+      # Try tlp-git from AUR
+      if check_aur_available "tlp-git"; then
+        info "Installing tlp-git from AUR..."
+        if aur tlp-git; then
+          tlp_installed=true
+          success "TLP installed as tlp-git from AUR"
+        fi
+      fi
+      
+      # Try tlp-rdw-git if still not installed
+      if [[ "$tlp_installed" == false ]] && check_aur_available "tlp-rdw-git"; then
+        info "Installing tlp-rdw-git from AUR (includes TLP)..."
+        if aur tlp-rdw-git; then
+          tlp_installed=true
+          success "TLP installed via tlp-rdw-git"
+        fi
+      fi
+    fi
+    
+    # Method 4: Manual compilation if all else fails
+    if [[ "$tlp_installed" == false ]]; then
+      warn "All package manager methods failed, attempting manual compilation..."
+      if install_tlp_manual; then
+        tlp_installed=true
+        success "TLP installed via manual compilation"
+      else
+        err "Failed to install TLP via all methods"
+        return 1
+      fi
+    fi
+    
+    # Install TLP RDW (Radio Device Wizard)
+    info "Installing TLP RDW (Radio Device Wizard)..."
+    
+    # Method 1: Official repository
+    if check_package_available "tlp-rdw"; then
+      info "TLP RDW available in official repository, installing..."
+      if pac tlp-rdw; then
+        tlp_rdw_installed=true
+        success "TLP RDW installed from official repository"
+      else
+        warn "Failed to install TLP RDW from official repository"
+      fi
+    fi
+    
+    # Method 2: AUR
+    if [[ "$tlp_rdw_installed" == false ]] && check_aur_available "tlp-rdw"; then
+      info "TLP RDW available in AUR, installing via yay..."
+      if aur tlp-rdw; then
+        tlp_rdw_installed=true
+        success "TLP RDW installed from AUR"
+      else
+        warn "Failed to install TLP RDW from AUR"
+      fi
+    fi
+    
+    # Method 3: Alternative names
+    if [[ "$tlp_rdw_installed" == false ]]; then
+      info "Trying alternative TLP RDW package names..."
+      
+      # Try tlp-rdw-git
+      if check_aur_available "tlp-rdw-git"; then
+        info "Installing tlp-rdw-git from AUR..."
+        if aur tlp-rdw-git; then
+          tlp_rdw_installed=true
+          success "TLP RDW installed as tlp-rdw-git"
+        fi
+      fi
+    fi
+    
+    # Method 4: Manual compilation if needed
+    if [[ "$tlp_rdw_installed" == false ]]; then
+      warn "All package manager methods failed for TLP RDW, attempting manual compilation..."
+      if install_tlp_rdw_manual; then
+        tlp_rdw_installed=true
+        success "TLP RDW installed via manual compilation"
+      else
+        warn "Failed to install TLP RDW, but continuing with TLP only"
+      fi
+    fi
+    
+    return 0
+  }
   
-  # thermald for thermal management
-  pac thermald
+  # Install TLP with all fallbacks
+  if ! install_tlp_with_fallbacks; then
+    err "Failed to install TLP power management tools"
+    return 1
+  fi
+  
+  # Install thermald for thermal management
+  info "Installing thermald (thermal management daemon)..."
+  if check_package_available "thermald"; then
+    if pac thermald; then
+      success "thermald installed from official repository"
+    else
+      warn "Failed to install thermald from official repository"
+    fi
+  elif check_aur_available "thermald"; then
+    if aur thermald; then
+      success "thermald installed from AUR"
+    else
+      warn "Failed to install thermald from AUR"
+    fi
+  else
+    warn "thermald not available in official repos or AUR"
+  fi
   
   # Enable services
   if ! is_debug_mode; then
@@ -499,5 +740,6 @@ show_dell_xps_post_install_info() {
 export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
 export -f install_ipu6_drivers configure_dell_xps_kernel_modules
 export -f install_dell_xps_power_management configure_tlp_dell_xps
+export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
