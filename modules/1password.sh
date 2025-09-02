@@ -532,9 +532,14 @@ setup_1password_complete() {
         echo -e "1) ${BOLD}Mobile + Desktop Flow${NC} (easiest with phone)"
         echo "   • Use mobile app to configure desktop"
         echo "   • Then integrate CLI with desktop"
-        echo -e "2) ${BOLD}Direct CLI${NC} (recommended for scripts)"
-        echo -e "3) ${BOLD}Interactive helper${NC} (all options)"
-        echo -e "4) ${BOLD}Basic manual configuration${NC}"
+        echo -e "2) ${BOLD}Direct CLI${NC} (for Setup Code or manual data entry)"
+        echo "   • Setup Code from Emergency Kit OR complete data entry"
+        echo -e "3) ${BOLD}Interactive helper${NC} (runs dedicated setup script)"
+        echo "   • Full-featured guided configuration"
+        echo "   • All options with better user experience"
+        echo -e "4) ${BOLD}Basic manual configuration${NC} (simple op account add)"
+        echo "   • Uses op command directly"
+        echo "   • Uses default URL from configuration if available"
         echo -e "5) ${BOLD}Skip 1Password configuration${NC}"
         echo
         echo -n "Choose (1/2/3/4/5): "
@@ -572,32 +577,80 @@ setup_1password_complete() {
             fi
             ;;
           3)
-            if [[ -x "./1password-helper.sh" ]]; then
-              if ./1password-helper.sh; then
-                success "Helper completed successfully"
-                break
-              else
-                err "Helper failed to configure 1Password"
-                if ! ask_yes_no "Try a different configuration method?"; then
-                  return 1
-                fi
-              fi
-            else
-              err "Helper not found, falling back to basic configuration"
-              if op account add; then
-                if signin_1password_cli; then
-                  success "Basic configuration completed successfully!"
-                  break
+            # Try different possible locations for the helper
+            local helper_paths=(
+              "./helpers/1password-helper.sh"
+              "$SCRIPT_DIR/helpers/1password-helper.sh"
+              "$(dirname "${BASH_SOURCE[0]}")/../helpers/1password-helper.sh"
+            )
+            
+            local helper_found=false
+            for helper_path in "${helper_paths[@]}"; do
+              if [[ -x "$helper_path" ]]; then
+                info "Running interactive helper: $helper_path"
+                if "$helper_path"; then
+                  success "Interactive helper completed successfully!"
+                  break 2  # Break out of both loops
                 else
-                  err "Failed to sign in after basic configuration"
+                  err "Interactive helper failed to configure 1Password"
+                  if ! ask_yes_no "Try a different configuration method?"; then
+                    return 1
+                  fi
+                  break  # Try different method
+                fi
+                helper_found=true
+                break
+              fi
+            done
+            
+            if [[ "$helper_found" == "false" ]]; then
+              warn "Interactive helper not found at expected locations"
+              echo "Falling back to basic configuration with defaults from .env"
+              echo
+              
+              # Use URL from .env if available
+              local address="${ONEPASSWORD_URL:-}"
+              if [[ -n "$address" ]]; then
+                # Clean URL format
+                address="${address#https://}"
+                address="${address#http://}"
+                address="${address%/}"
+                echo "Using configured address: $address"
+                echo -n "Enter email: "
+                read -r email
+                if op account add --address "$address" --email "$email"; then
+                  if signin_1password_cli; then
+                    success "Basic configuration completed successfully!"
+                    break
+                  else
+                    err "Failed to sign in after basic configuration"
+                    if ! ask_yes_no "Try a different configuration method?"; then
+                      return 1
+                    fi
+                  fi
+                else
+                  err "Failed to add account with configured address"
                   if ! ask_yes_no "Try a different configuration method?"; then
                     return 1
                   fi
                 fi
               else
-                err "Basic configuration failed"
-                if ! ask_yes_no "Try a different configuration method?"; then
-                  return 1
+                echo "No default URL configured. Using standard op account add..."
+                if op account add; then
+                  if signin_1password_cli; then
+                    success "Basic configuration completed successfully!"
+                    break
+                  else
+                    err "Failed to sign in after basic configuration"
+                    if ! ask_yes_no "Try a different configuration method?"; then
+                      return 1
+                    fi
+                  fi
+                else
+                  err "Basic configuration failed"
+                  if ! ask_yes_no "Try a different configuration method?"; then
+                    return 1
+                  fi
                 fi
               fi
             fi
