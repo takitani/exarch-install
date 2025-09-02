@@ -657,20 +657,67 @@ setup_1password_complete() {
             ;;
           4)
             info "Basic manual configuration..."
-            if op account add; then
-              if signin_1password_cli; then
-                success "Basic manual configuration completed successfully!"
-                break
+            
+            # Use URL from .env if available
+            local address="${ONEPASSWORD_URL:-}"
+            if [[ -n "$address" ]]; then
+              # Clean URL format
+              address="${address#https://}"
+              address="${address#http://}"
+              address="${address%/}"
+              
+              info "Using configured URL: $address"
+              
+              # Use email from .env if available
+              local email="${ONEPASSWORD_EMAIL:-}"
+              if [[ -n "$email" ]]; then
+                info "Using configured email: $email"
               else
-                err "Failed to sign in after manual configuration"
+                echo -n "Enter email for $address: "
+                read -r email
+              fi
+              
+              if [[ -n "$email" ]]; then
+                if op account add --address "$address" --email "$email"; then
+                  if signin_1password_cli; then
+                    success "Basic manual configuration completed successfully!"
+                    break
+                  else
+                    err "Failed to sign in after manual configuration"
+                    if ! ask_yes_no "Try a different configuration method?"; then
+                      return 1
+                    fi
+                  fi
+                else
+                  err "Failed to add account with configured settings"
+                  echo "Check your email and Secret Key when prompted"
+                  if ! ask_yes_no "Try a different configuration method?"; then
+                    return 1
+                  fi
+                fi
+              else
+                err "Email is required"
                 if ! ask_yes_no "Try a different configuration method?"; then
                   return 1
                 fi
               fi
             else
-              err "Manual configuration failed"
-              if ! ask_yes_no "Try a different configuration method?"; then
-                return 1
+              info "No default URL configured, using standard op account add..."
+              if op account add; then
+                if signin_1password_cli; then
+                  success "Basic manual configuration completed successfully!"
+                  break
+                else
+                  err "Failed to sign in after manual configuration"
+                  if ! ask_yes_no "Try a different configuration method?"; then
+                    return 1
+                  fi
+                fi
+              else
+                err "Manual configuration failed"
+                if ! ask_yes_no "Try a different configuration method?"; then
+                  return 1
+                fi
               fi
             fi
             ;;
