@@ -920,12 +920,21 @@ generate_pgpass_file() {
   local pgpass_file="$HOME/.pgpass"
   local backup_file=""
   
-  # Workaround for DNS resolution issues with 1Password CLI
-  # The error "dial tcp: lookup my.1password.com on [::1]:53" suggests it's trying to use localhost as DNS
-  # This can happen when systemd-resolved is misconfigured or not running properly
+  # Check if systemd-resolved is working properly before modifying DNS
+  local dns_working=false
   
-  # Test DNS resolution first
-  if ! nslookup my.1password.com >/dev/null 2>&1; then
+  # Test if systemd-resolved is managing DNS properly
+  if command_exists resolvectl && resolvectl status >/dev/null 2>&1; then
+    # Check if systemd-resolved is in managed mode and working
+    if resolvectl status 2>/dev/null | grep -q "resolv.conf mode: managed" && \
+       resolvectl status 2>/dev/null | grep -q "Current DNS Server:"; then
+      dns_working=true
+      info "systemd-resolved is working properly, skipping DNS modifications"
+    fi
+  fi
+  
+  # Only apply DNS workaround if systemd-resolved is not working
+  if [[ "$dns_working" == "false" ]]; then
     warn "DNS resolution issue detected, applying workaround..."
     
     # Temporarily add public DNS to resolv.conf if needed

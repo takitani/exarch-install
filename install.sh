@@ -935,8 +935,21 @@ perform_pre_installation_checks() {
 setup_installation_environment() {
   info "Setting up installation environment..."
   
-  # Setup temporary DNS if configured
-  if [[ "${#DNS_SERVERS[@]}" -gt 0 ]] && [[ ! -f "/tmp/resolv.conf.backup" ]]; then
+  # Check if systemd-resolved is working properly before modifying DNS
+  local dns_working=false
+  
+  # Test if systemd-resolved is managing DNS properly
+  if command_exists resolvectl && resolvectl status >/dev/null 2>&1; then
+    # Check if systemd-resolved is in managed mode and working
+    if resolvectl status 2>/dev/null | grep -q "resolv.conf mode: managed" && \
+       resolvectl status 2>/dev/null | grep -q "Current DNS Server:"; then
+      dns_working=true
+      info "systemd-resolved is working properly, skipping DNS modifications"
+    fi
+  fi
+  
+  # Setup temporary DNS only if systemd-resolved is not working and DNS_SERVERS is configured
+  if [[ "$dns_working" == "false" ]] && [[ "${#DNS_SERVERS[@]}" -gt 0 ]] && [[ ! -f "/tmp/resolv.conf.backup" ]]; then
     info "Configuring temporary DNS..."
     add_sudo_command "cp /etc/resolv.conf /tmp/resolv.conf.backup"
     
@@ -1149,10 +1162,26 @@ perform_post_installation_tasks() {
     yay -Sc --noconfirm >/dev/null 2>&1 || true
   fi
   
-  # Restore DNS configuration
+  # Restore DNS configuration only if we modified it
   if [[ -f "/tmp/resolv.conf.backup" ]]; then
     info "Restoring DNS configuration..."
-    sudo mv /tmp/resolv.conf.backup /etc/resolv.conf
+    
+    # Check if systemd-resolved is working properly now
+    local dns_working=false
+    if command_exists resolvectl && resolvectl status >/dev/null 2>&1; then
+      if resolvectl status 2>/dev/null | grep -q "resolv.conf mode: managed" && \
+         resolvectl status 2>/dev/null | grep -q "Current DNS Server:"; then
+        dns_working=true
+      fi
+    fi
+    
+    if [[ "$dns_working" == "true" ]]; then
+      info "systemd-resolved is working, removing backup and letting it manage DNS"
+      sudo rm -f "/tmp/resolv.conf.backup"
+    else
+      info "Restoring original DNS configuration..."
+      sudo mv /tmp/resolv.conf.backup /etc/resolv.conf
+    fi
   fi
   
   success "Post-installation tasks completed"
