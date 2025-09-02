@@ -678,6 +678,14 @@ setup_1password_complete() {
               fi
               
               if [[ -n "$email" ]]; then
+                echo "Debug: About to run: op account add --address '$address' --email '$email'"
+                echo "Debug: Testing connectivity to $address..."
+                if curl -I -s --connect-timeout 10 "https://$address" >/dev/null 2>&1; then
+                  info "✅ Connectivity to $address OK"
+                else
+                  warn "⚠️ Connectivity test to $address failed - but will try anyway"
+                fi
+                
                 if op account add --address "$address" --email "$email"; then
                   if signin_1password_cli; then
                     success "Basic manual configuration completed successfully!"
@@ -690,7 +698,30 @@ setup_1password_complete() {
                   fi
                 else
                   err "Failed to add account with configured settings"
-                  echo "Check your email and Secret Key when prompted"
+                  echo "Command executed: op account add --address '$address' --email '$email'"
+                  echo
+                  echo "Possible issues:"
+                  echo "  • Check if URL is correct: $address"
+                  echo "  • Check network connectivity from this machine"
+                  echo "  • Try manually: curl -I https://$address"
+                  echo
+                  
+                  # Offer alternative URLs to try
+                  if [[ "$address" == "exatodigital.1password.com" ]]; then
+                    if ask_yes_no "Try with 'exatodigitalteam.1password.com' instead?"; then
+                      address="exatodigitalteam.1password.com"
+                      info "Retrying with: $address"
+                      if op account add --address "$address" --email "$email"; then
+                        if signin_1password_cli; then
+                          success "Basic manual configuration completed successfully!"
+                          break
+                        fi
+                      else
+                        err "Also failed with alternative URL"
+                      fi
+                    fi
+                  fi
+                  
                   if ! ask_yes_no "Try a different configuration method?"; then
                     return 1
                   fi
