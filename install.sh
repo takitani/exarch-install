@@ -955,17 +955,43 @@ execute_installation_modules() {
   
   # 1Password integration
   if module_enabled "1password"; then
-    setup_1password_complete
+    if command -v setup_1password_complete >/dev/null 2>&1; then
+      if ! setup_1password_complete; then
+        warn "1Password configuration failed or was skipped"
+        echo
+        if ask_yes_no "Do you want to continue without 1Password integration?"; then
+          info "Continuing without 1Password..."
+        else
+          err "Installation aborted due to 1Password configuration failure"
+          exit 1
+        fi
+      fi
+    else
+      err "1Password module not loaded properly. Please run from the main directory."
+      echo "Try: git clone https://github.com/takitani/exarch-install && cd exarch-install && ./install.sh"
+      exit 1
+    fi
   fi
   
   # SSH keys from 1Password
   if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
-    setup_ssh_keys_from_1password
+    if command -v setup_ssh_keys_from_1password >/dev/null 2>&1; then
+      setup_ssh_keys_from_1password || warn "SSH key setup failed or was skipped"
+    else
+      warn "SSH key function not available. Skipping SSH key configuration."
+    fi
   fi
   
   # Remmina connections (standalone)
   if module_enabled "remmina"; then
-    setup_remmina_connections_complete
+    if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
+      if ! setup_remmina_connections_complete; then
+        warn "Remmina configuration failed (likely 1Password not configured)"
+        echo "You can configure Remmina connections later using: ./helpers/1password-helper.sh"
+      fi
+    else
+      warn "Remmina module not loaded. Skipping Remmina configuration."
+    fi
   fi
   
   
