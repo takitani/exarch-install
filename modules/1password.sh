@@ -679,7 +679,7 @@ generate_pgpass_file() {
   # Backup existing file
   if [[ -f "$pgpass_file" ]]; then
     backup_file="$pgpass_file.backup.$(date +%Y%m%d_%H%M%S)"
-    if backup_file "$pgpass_file" "$backup_file"; then
+    if cp "$pgpass_file" "$backup_file"; then
       info "Backup created: $backup_file"
     fi
   fi
@@ -687,10 +687,24 @@ generate_pgpass_file() {
   # Search for database credentials
   info "Searching for database credentials in 1Password..."
   
+  # Debug: Show available categories
+  info "Available item categories:"
+  op item list --format=json 2>/dev/null | jq -r '[.[].category] | unique | join(", ")' || true
+  
   local db_items
-  if ! db_items=$(op item list --categories Database --format=json 2>/dev/null); then
+  info "Attempting to list Database category items..."
+  if ! db_items=$(op item list --categories Database --format=json 2>&1); then
     err "Failed to list database credentials from 1Password"
-    return 1
+    err "Error output: $db_items"
+    
+    # Try alternative search
+    info "Trying alternative search for database items..."
+    db_items=$(op item list --format=json 2>/dev/null | jq '[.[] | select(.category == "DATABASE" or .category == "Database" or .category == "database")]' 2>/dev/null)
+    
+    if [[ -z "$db_items" ]] || [[ "$db_items" == "[]" ]]; then
+      err "Alternative search also failed"
+      return 1
+    fi
   fi
   
   if [[ "$db_items" == "[]" ]] || [[ -z "$db_items" ]]; then
