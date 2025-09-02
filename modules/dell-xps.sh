@@ -145,6 +145,12 @@ setup_dell_xps_9320_webcam() {
 
 # Install Intel Visual Sensing Controller firmware
 install_ivsc_firmware() {
+  # Check if already installed
+  if pacman -Q ivsc-firmware-git >/dev/null 2>&1 || pacman -Q intel-ivsc-firmware >/dev/null 2>&1; then
+    info "ivsc-firmware already installed, skipping build"
+    return 0
+  fi
+  
   info "Creating and installing PKGBUILD for ivsc-firmware..."
   
   local tmpdir_ivsc
@@ -244,6 +250,12 @@ install_ivsc_firmware_manual() {
 
 # Install IPU6 camera drivers
 install_ipu6_drivers() {
+  # Check if already installed
+  if pacman -Q ipu6-drivers-git >/dev/null 2>&1 || pacman -Q intel-ipu6-drivers >/dev/null 2>&1; then
+    info "ipu6-drivers already installed, skipping build"
+    return 0
+  fi
+  
   info "Creating and installing PKGBUILD for ipu6-drivers..."
   
   local tmpdir_ipu6
@@ -525,48 +537,45 @@ install_dell_xps_power_management() {
     warn "thermald not available in official repos or AUR"
   fi
   
-  # Only configure thermald if it was successfully installed
-  if [[ "$thermald_installed" == "true" ]]; then
-    # Verify binary exists before proceeding
-    if [[ -f "/usr/bin/thermald" ]]; then
-      info "thermald binary verified, configuring service..."
-      
-      if ! is_debug_mode; then
-        # Check if thermald service exists, create if not
-        if [[ ! -f /usr/lib/systemd/system/thermald.service ]] && [[ ! -f /etc/systemd/system/thermald.service ]]; then
-          warn "thermald service file not found, creating manual service..."
-          create_thermald_service
-        fi
-        
-        # Enable services
-        if systemctl list-unit-files | grep -q "thermald.service"; then
-          sudo systemctl enable thermald.service
-          
-          # Start service if not running
-          if ! systemctl is-active thermald >/dev/null 2>&1; then
-            sudo systemctl start thermald.service
-          fi
-        else
-          warn "thermald service not found in systemd, manual start required"
-        fi
-      fi
-      
-      CONFIGURED_RUNTIMES+=("thermald thermal management")
-      success "thermald configured successfully"
-    else
-      err "thermald binary not found at /usr/bin/thermald despite successful installation"
-      warn "Skipping thermald service configuration"
-    fi
-  else
-    warn "thermald not installed, skipping service configuration"
-  fi
-  
-  # Enable TLP service only
+  # Enable services
   if ! is_debug_mode; then
     # Check if TLP service exists, create if not
     if [[ ! -f /usr/lib/systemd/system/tlp.service ]] && [[ ! -f /etc/systemd/system/tlp.service ]]; then
       warn "TLP service file not found, creating manual service..."
       create_tlp_service
+    fi
+    
+    # Only configure thermald if it was successfully installed and binary exists
+    if [[ "$thermald_installed" == "true" ]] && [[ -f "/usr/bin/thermald" ]]; then
+      info "thermald binary verified, configuring service..."
+      
+      # Check if thermald service exists, create if not
+      if [[ ! -f /usr/lib/systemd/system/thermald.service ]] && [[ ! -f /etc/systemd/system/thermald.service ]]; then
+        warn "thermald service file not found, creating manual service..."
+        create_thermald_service
+      fi
+      
+      # Enable thermald service
+      if systemctl list-unit-files | grep -q "thermald.service"; then
+        sudo systemctl enable thermald.service
+        
+        # Start service if not running
+        if ! systemctl is-active thermald >/dev/null 2>&1; then
+          sudo systemctl start thermald.service
+        fi
+      else
+        warn "thermald service not found in systemd, manual start required"
+      fi
+      
+      CONFIGURED_RUNTIMES+=("thermald thermal management")
+      success "thermald configured successfully"
+    else
+      if [[ "$thermald_installed" == "true" ]]; then
+        err "thermald binary not found at /usr/bin/thermald despite successful installation"
+        warn "Skipping thermald service configuration"
+      else
+        warn "thermald not installed, skipping service configuration"
+      fi
     fi
     
     # Enable TLP service
@@ -717,40 +726,41 @@ install_dell_utilities() {
     err "Failed to install fwupd"
   fi
   
-  # Only configure fwupd if it was successfully installed
-  if [[ "$fwupd_installed" == "true" ]]; then
-    # Verify binary exists before proceeding
-    if [[ -f "/usr/bin/fwupd" ]]; then
-      info "fwupd binary verified, configuring service..."
-      
-      if ! is_debug_mode; then
-        # Check if fwupd service exists, create if not
-        if [[ ! -f /usr/lib/systemd/system/fwupd.service ]] && [[ ! -f /etc/systemd/system/fwupd.service ]]; then
-          warn "fwupd service file not found, creating manual service..."
-          create_fwupd_service
-        fi
-        
-        # Enable fwupd service
-        if systemctl list-unit-files | grep -q "fwupd.service"; then
-          sudo systemctl enable fwupd.service
-          
-          if ! systemctl is-active fwupd >/dev/null 2>&1; then
-            sudo systemctl start fwupd.service
-          fi
-        else
-          warn "fwupd service not found in systemd, manual start required"
-        fi
+  # Only configure fwupd if it was successfully installed and binary exists
+  if [[ "$fwupd_installed" == "true" ]] && [[ -f "/usr/bin/fwupd" ]]; then
+    info "fwupd binary verified, configuring service..."
+    
+    if ! is_debug_mode; then
+      # Check if fwupd service exists, create if not
+      if [[ ! -f /usr/lib/systemd/system/fwupd.service ]] && [[ ! -f /etc/systemd/system/fwupd.service ]]; then
+        warn "fwupd service file not found, creating manual service..."
+        create_fwupd_service
       fi
       
-      CONFIGURED_RUNTIMES+=("fwupd firmware updater")
-      success "fwupd configured successfully"
-    else
+      # Enable fwupd service
+      if systemctl list-unit-files | grep -q "fwupd.service"; then
+        sudo systemctl enable fwupd.service
+        
+        if ! systemctl is-active fwupd >/dev/null 2>&1; then
+          sudo systemctl start fwupd.service
+        fi
+      else
+        warn "fwupd service not found in systemd, manual start required"
+      fi
+    fi
+    
+    CONFIGURED_RUNTIMES+=("fwupd firmware updater")
+    success "fwupd configured successfully"
+  else
+    if [[ "$fwupd_installed" == "true" ]]; then
       err "fwupd binary not found at /usr/bin/fwupd despite successful installation"
       warn "Skipping fwupd service configuration"
+    else
+      warn "fwupd not installed, skipping service configuration"
     fi
-  else
-    warn "fwupd not installed, skipping service configuration"
   fi
+  
+  success "Firmware update utilities configured"
 }
 
 # Create shutdown hook to prevent hanging
@@ -1233,80 +1243,6 @@ cleanup_dell_xps_services() {
   success "Cleanup completed - safe to reboot"
 }
 
-# Function to clean up broken services
-cleanup_broken_services() {
-  info "Checking for broken services and cleaning up..."
-  
-  local services_to_check=("fwupd" "thermald" "tlp")
-  local cleaned_services=()
-  
-  for service in "${services_to_check[@]}"; do
-    # Check if service exists but binary is missing
-    if systemctl list-unit-files | grep -q "${service}.service" && [[ ! -f "/usr/bin/$service" ]]; then
-      warn "Broken service detected: $service (binary missing)"
-      
-      if ! is_debug_mode; then
-        # Stop and disable the broken service
-        sudo systemctl stop "${service}.service" 2>/dev/null || true
-        sudo systemctl disable "${service}.service" 2>/dev/null || true
-        
-        # Remove manual service files
-        sudo rm -f "/etc/systemd/system/${service}.service"
-        
-        cleaned_services+=("$service")
-        info "Cleaned up broken service: $service"
-      else
-        info "[DEBUG] Would clean up broken service: $service"
-      fi
-    fi
-  done
-  
-  if [[ ${#cleaned_services[@]} -gt 0 ]]; then
-    success "Cleaned up ${#cleaned_services[@]} broken service(s): ${cleaned_services[*]}"
-  else
-    info "No broken services found"
-  fi
-}
-
-# Function to verify service integrity
-verify_service_integrity() {
-  info "Verifying service integrity..."
-  
-  local services_to_verify=("fwupd" "thermald" "tlp")
-  local verified_services=()
-  local broken_services=()
-  
-  for service in "${services_to_verify[@]}"; do
-    if [[ -f "/usr/bin/$service" ]]; then
-      if systemctl list-unit-files | grep -q "${service}.service"; then
-        verified_services+=("$service")
-        info "✓ $service: binary exists, service configured"
-      else
-        warn "⚠ $service: binary exists but no service configured"
-      fi
-    else
-      if systemctl list-unit-files | grep -q "${service}.service"; then
-        broken_services+=("$service")
-        err "✗ $service: service configured but binary missing"
-      else
-        info "○ $service: not installed (expected)"
-      fi
-    fi
-  done
-  
-  # Summary
-  if [[ ${#verified_services[@]} -gt 0 ]]; then
-    success "Verified services: ${verified_services[*]}"
-  fi
-  
-  if [[ ${#broken_services[@]} -gt 0 ]]; then
-    err "Broken services found: ${broken_services[*]}"
-    return 1
-  fi
-  
-  return 0
-}
-
 # Export all functions at the end after they are defined
 export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
 export -f install_ipu6_drivers configure_dell_xps_kernel_modules
@@ -1314,5 +1250,5 @@ export -f install_dell_xps_power_management configure_tlp_dell_xps
 export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
-export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services cleanup_broken_services verify_service_integrity
+export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services
 export -f create_dell_xps_shutdown_hook create_dell_xps_shutdown_service configure_dell_xps_kernel_params
