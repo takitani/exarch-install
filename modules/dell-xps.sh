@@ -399,9 +399,17 @@ install_dell_xps_power_management() {
     
     info "Installing TLP (Linux Advanced Power Management)..."
     
-    # Method 1: Try official repository first
+    # Method 1: Try official repository first (with conflict resolution)
     if check_package_available "tlp"; then
       info "TLP available in official repository, installing..."
+      info "Resolving potential conflicts with power-profiles-daemon..."
+      
+      # Remove power-profiles-daemon if it conflicts with TLP
+      if pacman -Q power-profiles-daemon >/dev/null 2>&1; then
+        info "Removing power-profiles-daemon to resolve TLP conflict..."
+        sudo pacman -R power-profiles-daemon --noconfirm
+      fi
+      
       if pac tlp; then
         tlp_installed=true
         success "TLP installed from official repository"
@@ -459,9 +467,17 @@ install_dell_xps_power_management() {
     # Install TLP RDW (Radio Device Wizard)
     info "Installing TLP RDW (Radio Device Wizard)..."
     
-    # Method 1: Official repository
+    # Method 1: Official repository (with conflict resolution)
     if check_package_available "tlp-rdw"; then
       info "TLP RDW available in official repository, installing..."
+      info "Resolving potential conflicts with power-profiles-daemon..."
+      
+      # Remove power-profiles-daemon if it conflicts with TLP RDW
+      if pacman -Q power-profiles-daemon >/dev/null 2>&1; then
+        info "Removing power-profiles-daemon to resolve TLP RDW conflict..."
+        sudo pacman -R power-profiles-daemon --noconfirm
+      fi
+      
       if pac tlp-rdw; then
         tlp_rdw_installed=true
         success "TLP RDW installed from official repository"
@@ -523,6 +539,27 @@ install_dell_xps_power_management() {
     if pac thermald; then
       success "thermald installed from official repository"
       thermald_installed=true
+      
+      # Verify installation and find binary location
+      if pacman -Q thermald >/dev/null 2>&1; then
+        info "thermald package verified as installed"
+        
+        # Find thermald binary in common locations
+        local thermald_binary=""
+        for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+          if [[ -f "$path" ]]; then
+            thermald_binary="$path"
+            break
+          fi
+        done
+        
+        if [[ -n "$thermald_binary" ]]; then
+          info "thermald binary found at: $thermald_binary"
+        else
+          warn "thermald binary not found in common locations, checking package contents..."
+          pacman -Ql thermald | grep -E "(thermald|bin/)" | head -5
+        fi
+      fi
     else
       warn "Failed to install thermald from official repository"
     fi
@@ -530,6 +567,27 @@ install_dell_xps_power_management() {
     if aur thermald; then
       success "thermald installed from AUR"
       thermald_installed=true
+      
+      # Verify installation and find binary location
+      if yay -Q thermald >/dev/null 2>&1; then
+        info "thermald package verified as installed from AUR"
+        
+        # Find thermald binary in common locations
+        local thermald_binary=""
+        for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+          if [[ -f "$path" ]]; then
+            thermald_binary="$path"
+            break
+          fi
+        done
+        
+        if [[ -n "$thermald_binary" ]]; then
+          info "thermald binary found at: $thermald_binary"
+        else
+          warn "thermald binary not found in common locations, checking package contents..."
+          yay -Ql thermald | grep -E "(thermald|bin/)" | head -5
+        fi
+      fi
     else
       warn "Failed to install thermald from AUR"
     fi
@@ -546,7 +604,15 @@ install_dell_xps_power_management() {
     fi
     
     # Only configure thermald if it was successfully installed and binary exists
-    if [[ "$thermald_installed" == "true" ]] && [[ -f "/usr/bin/thermald" ]]; then
+    local thermald_binary=""
+    for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+      if [[ -f "$path" ]]; then
+        thermald_binary="$path"
+        break
+      fi
+    done
+    
+    if [[ "$thermald_installed" == "true" ]] && [[ -n "$thermald_binary" ]]; then
       info "thermald binary verified, configuring service..."
       
       # Check if thermald service exists, create if not
@@ -571,20 +637,47 @@ install_dell_xps_power_management() {
       success "thermald configured successfully"
     else
       if [[ "$thermald_installed" == "true" ]]; then
-        err "thermald binary not found at /usr/bin/thermald despite successful installation"
+        err "thermald binary not found in common locations despite successful installation"
         warn "Skipping thermald service configuration"
+        warn "Check package contents with: pacman -Ql thermald | grep bin/"
       else
         warn "thermald not installed, skipping service configuration"
       fi
     fi
     
-    # Enable TLP service
+    # Enable TLP service (with better error handling)
     if systemctl list-unit-files | grep -q "tlp.service"; then
-      sudo systemctl enable tlp.service
+      info "Configuring TLP service..."
       
-      # Start service if not running
-      if ! systemctl is-active tlp >/dev/null 2>&1; then
-        sudo systemctl start tlp.service
+      # Stop service first if it's running (to clear any errors)
+      if systemctl is-active tlp >/dev/null 2>&1; then
+        info "Stopping TLP service to clear any errors..."
+        sudo systemctl stop tlp.service
+        sleep 2
+      fi
+      
+      # Enable service
+      if sudo systemctl enable tlp.service; then
+        success "TLP service enabled"
+        
+        # Start service with error checking
+        if sudo systemctl start tlp.service; then
+          success "TLP service started successfully"
+          
+          # Wait a moment and check status
+          sleep 3
+          if systemctl is-active tlp >/dev/null 2>&1; then
+            success "TLP service is running"
+          else
+            warn "TLP service failed to start properly"
+            systemctl status tlp.service --no-pager -l
+          fi
+        else
+          err "Failed to start TLP service"
+          systemctl status tlp.service --no-pager -l
+        fi
+      else
+        err "Failed to enable TLP service"
       fi
     else
       warn "TLP service not found in systemd, manual start required"
@@ -722,12 +815,41 @@ install_dell_utilities() {
   if pac fwupd; then
     success "fwupd installed successfully"
     fwupd_installed=true
+    
+    # Verify installation and find binary location
+    if pacman -Q fwupd >/dev/null 2>&1; then
+      info "fwupd package verified as installed"
+      
+      # Find fwupd binary in common locations
+      local fwupd_binary=""
+      for path in "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
+        if [[ -f "$path" ]]; then
+          fwupd_binary="$path"
+          break
+        fi
+      done
+      
+      if [[ -n "$fwupd_binary" ]]; then
+        info "fwupd binary found at: $fwupd_binary"
+      else
+        warn "fwupd binary not found in common locations, checking package contents..."
+        pacman -Ql fwupd | grep -E "(fwupd|bin/)" | head -5
+      fi
+    fi
   else
     err "Failed to install fwupd"
   fi
   
   # Only configure fwupd if it was successfully installed and binary exists
-  if [[ "$fwupd_installed" == "true" ]] && [[ -f "/usr/bin/fwupd" ]]; then
+  local fwupd_binary=""
+  for path in "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
+    if [[ -f "$path" ]]; then
+      fwupd_binary="$path"
+      break
+    fi
+  done
+  
+  if [[ "$fwupd_installed" == "true" ]] && [[ -n "$fwupd_binary" ]]; then
     info "fwupd binary verified, configuring service..."
     
     if ! is_debug_mode; then
@@ -752,12 +874,13 @@ install_dell_utilities() {
     CONFIGURED_RUNTIMES+=("fwupd firmware updater")
     success "fwupd configured successfully"
   else
-    if [[ "$fwupd_installed" == "true" ]]; then
-      err "fwupd binary not found at /usr/bin/fwupd despite successful installation"
-      warn "Skipping fwupd service configuration"
-    else
-      warn "fwupd not installed, skipping service configuration"
-    fi
+          if [[ "$fwupd_installed" == "true" ]]; then
+        err "fwupd binary not found in common locations despite successful installation"
+        warn "Skipping fwupd service configuration"
+        warn "Check package contents with: pacman -Ql fwupd | grep bin/"
+      else
+        warn "fwupd not installed, skipping service configuration"
+      fi
   fi
   
   success "Firmware update utilities configured"

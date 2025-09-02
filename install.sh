@@ -395,6 +395,7 @@ apply_profile() {
       SETUP_DOTFILES_MANAGEMENT=false
       SETUP_DEV_PGPASS=false
       SETUP_SSH_KEYS=false
+      SETUP_PTBR_KEYBOARD_LAYOUT=false
       SETUP_DELL_XPS_9320=false
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=false
@@ -1015,15 +1016,27 @@ execute_installation_modules() {
     fi
   fi
   
-  # Remmina connections (standalone)
+  # Remmina connections (standalone) - only if 1Password is available
   if module_enabled "remmina"; then
-    if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
-      if ! setup_remmina_connections_complete; then
-        warn "Remmina configuration failed (likely 1Password not configured)"
-        echo "You can configure Remmina connections later using: ./helpers/1password-helper.sh"
+    # Check if 1Password CLI is available and configured
+    if command_exists op; then
+      # Test if 1Password is actually authenticated
+      if timeout 5 op account list >/dev/null 2>&1 && timeout 5 op vault list >/dev/null 2>&1; then
+        if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
+          if ! setup_remmina_connections_complete; then
+            warn "Remmina configuration failed"
+            echo "You can configure Remmina connections later using: ./helpers/1password-helper.sh"
+          fi
+        else
+          warn "Remmina module not loaded. Skipping Remmina configuration."
+        fi
+      else
+        info "1Password CLI not authenticated, skipping Remmina configuration"
+        echo "Configure 1Password first, then run: ./helpers/1password-helper.sh"
       fi
     else
-      warn "Remmina module not loaded. Skipping Remmina configuration."
+      info "1Password CLI not available, skipping Remmina configuration"
+      echo "Install and configure 1Password first, then run: ./helpers/1password-helper.sh"
     fi
   fi
   
