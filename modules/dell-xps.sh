@@ -523,16 +523,39 @@ install_dell_xps_power_management() {
   
   # Enable services
   if ! is_debug_mode; then
-    sudo systemctl enable tlp.service
-    sudo systemctl enable thermald.service
-    
-    # Start services if not running
-    if ! systemctl is-active tlp >/dev/null 2>&1; then
-      sudo systemctl start tlp.service
+    # Check if TLP service exists, create if not
+    if [[ ! -f /usr/lib/systemd/system/tlp.service ]] && [[ ! -f /etc/systemd/system/tlp.service ]]; then
+      warn "TLP service file not found, creating manual service..."
+      create_tlp_service
     fi
     
-    if ! systemctl is-active thermald >/dev/null 2>&1; then
-      sudo systemctl start thermald.service
+    # Check if thermald service exists, create if not
+    if [[ ! -f /usr/lib/systemd/system/thermald.service ]] && [[ ! -f /etc/systemd/system/thermald.service ]]; then
+      warn "thermald service file not found, creating manual service..."
+      create_thermald_service
+    fi
+    
+    # Enable services
+    if systemctl list-unit-files | grep -q "tlp.service"; then
+      sudo systemctl enable tlp.service
+      
+      # Start service if not running
+      if ! systemctl is-active tlp >/dev/null 2>&1; then
+        sudo systemctl start tlp.service
+      fi
+    else
+      warn "TLP service not found in systemd, manual start required"
+    fi
+    
+    if systemctl list-unit-files | grep -q "thermald.service"; then
+      sudo systemctl enable thermald.service
+      
+      # Start service if not running
+      if ! systemctl is-active thermald >/dev/null 2>&1; then
+        sudo systemctl start thermald.service
+      fi
+    else
+      warn "thermald service not found in systemd, manual start required"
     fi
   fi
   
@@ -550,8 +573,8 @@ configure_tlp_dell_xps() {
   local tlp_config="/etc/tlp.conf"
   
   if [[ ! -f "$tlp_config" ]]; then
-    warn "TLP configuration file not found, skipping custom configuration"
-    return 1
+    warn "TLP configuration file not found, creating default configuration..."
+    create_tlp_config
   fi
   
   info "Applying Dell XPS optimizations to TLP..."
@@ -616,6 +639,13 @@ setup_dual_keyboard_dell_xps() {
   # Configure keyboard layouts
   local keyboard_config="/etc/X11/xorg.conf.d/00-keyboard.conf"
   
+  # Create X11 config directory if it doesn't exist
+  local config_dir="/etc/X11/xorg.conf.d"
+  if [[ ! -d "$config_dir" ]]; then
+    info "Creating X11 configuration directory: $config_dir"
+    sudo mkdir -p "$config_dir"
+  fi
+  
   if is_debug_mode; then
     info "[DEBUG] Would configure dual keyboard layout"
     return 0
@@ -658,11 +688,21 @@ install_dell_utilities() {
   pac fwupd
   
   if ! is_debug_mode; then
-    # Enable fwupd service
-    sudo systemctl enable fwupd.service
+    # Check if fwupd service exists, create if not
+    if [[ ! -f /usr/lib/systemd/system/fwupd.service ]] && [[ ! -f /etc/systemd/system/fwupd.service ]]; then
+      warn "fwupd service file not found, creating manual service..."
+      create_fwupd_service
+    fi
     
-    if ! systemctl is-active fwupd >/dev/null 2>&1; then
-      sudo systemctl start fwupd.service
+    # Enable fwupd service
+    if systemctl list-unit-files | grep -q "fwupd.service"; then
+      sudo systemctl enable fwupd.service
+      
+      if ! systemctl is-active fwupd >/dev/null 2>&1; then
+        sudo systemctl start fwupd.service
+      fi
+    else
+      warn "fwupd service not found in systemd, manual start required"
     fi
   fi
   
@@ -743,3 +783,176 @@ export -f install_dell_xps_power_management configure_tlp_dell_xps
 export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
+export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config
+
+# Create TLP systemd service manually
+create_tlp_service() {
+  info "Creating TLP systemd service manually..."
+  
+  local service_file="/etc/systemd/system/tlp.service"
+  
+  # Create service file
+  sudo tee "$service_file" > /dev/null << 'EOF'
+[Unit]
+Description=TLP - Linux Advanced Power Management
+Documentation=https://linrunner.de/tlp/
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/tlp start
+ExecStop=/usr/bin/tlp stop
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Reload systemd
+  sudo systemctl daemon-reload
+  
+  if [[ -f "$service_file" ]]; then
+    success "TLP service created: $service_file"
+    return 0
+  else
+    err "Failed to create TLP service file"
+    return 1
+  fi
+}
+
+# Create thermald systemd service manually
+create_thermald_service() {
+  info "Creating thermald systemd service manually..."
+  
+  local service_file="/etc/systemd/system/thermald.service"
+  
+  # Create service file
+  sudo tee "$service_file" > /dev/null << 'EOF'
+[Unit]
+Description=Thermal Daemon Service
+Documentation=https://github.com/intel/thermal_daemon
+After=syslog.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/thermald --no-daemon --log-level=info
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Reload systemd
+  sudo systemctl daemon-reload
+  
+  if [[ -f "$service_file" ]]; then
+    success "thermald service created: $service_file"
+    return 0
+  else
+    err "Failed to create thermald service file"
+    return 1
+  fi
+}
+
+# Create fwupd systemd service manually
+create_fwupd_service() {
+  info "Creating fwupd systemd service manually..."
+  
+  local service_file="/etc/systemd/system/fwupd.service"
+  
+  # Create service file
+  sudo tee "$service_file" > /dev/null << 'EOF'
+[Unit]
+Description=Firmware update daemon
+Documentation=man:fwupd(8)
+After=syslog.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/fwupd --daemon
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Reload systemd
+  sudo systemctl daemon-reload
+  
+  if [[ -f "$service_file" ]]; then
+    success "fwupd service created: $service_file"
+    return 0
+  else
+    err "Failed to create fwupd service file"
+    return 1
+  fi
+}
+
+# Create TLP configuration file
+create_tlp_config() {
+  info "Creating TLP configuration file..."
+  
+  local tlp_config="/etc/tlp.conf"
+  
+  # Create config file with Dell XPS optimizations
+  sudo tee "$tlp_config" > /dev/null << 'EOF'
+# TLP Configuration for Dell XPS 13 Plus (9320)
+# Generated by Exarch Scripts
+
+# Default TLP settings
+TLP_ENABLE=1
+TLP_DEFAULT_MODE=AC
+DISK_IDLE_SECS_ON_AC=0
+DISK_IDLE_SECS_ON_BAT=2
+MAX_LOST_WORK_SECS_ON_AC=15
+MAX_LOST_WORK_SECS_ON_BAT=60
+
+# CPU scaling governor
+CPU_SCALING_GOVERNOR_ON_AC=performance
+CPU_SCALING_GOVERNOR_ON_BAT=powersave
+
+# Battery optimization
+START_CHARGE_THRESH_BAT0=40
+STOP_CHARGE_THRESH_BAT0=80
+
+# Intel GPU power management
+INTEL_GPU_MIN_FREQ_ON_AC=0
+INTEL_GPU_MIN_FREQ_ON_BAT=0
+INTEL_GPU_MAX_FREQ_ON_AC=0
+INTEL_GPU_MAX_FREQ_ON_BAT=0
+INTEL_GPU_BOOST_FREQ_ON_AC=0
+INTEL_GPU_BOOST_FREQ_ON_BAT=0
+
+# WiFi power saving
+WIFI_PWR_ON_AC=off
+WIFI_PWR_ON_BAT=on
+
+# USB autosuspend
+USB_AUTOSUSPEND=1
+USB_BLACKLIST_WWAN=1
+
+# PCIe Active State Power Management
+PCIE_ASPM_ON_AC=default
+PCIE_ASPM_ON_BAT=powersave
+
+# Audio power saving
+SOUND_POWER_SAVE_ON_AC=0
+SOUND_POWER_SAVE_ON_BAT=1
+SOUND_POWER_SAVE_CONTROLLER=Y
+
+# Runtime power management
+RUNTIME_PM_ON_AC=on
+RUNTIME_PM_ON_BAT=auto
+EOF
+
+  if [[ -f "$tlp_config" ]]; then
+    success "TLP configuration created: $tlp_config"
+    return 0
+  else
+    err "Failed to create TLP configuration file"
+    return 1
+  fi
+}
