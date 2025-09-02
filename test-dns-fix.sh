@@ -208,13 +208,88 @@ test_1password() {
     fi
 }
 
+# Função para instalar ferramentas DNS se necessário
+install_dns_tools() {
+    echo -e "\n${BOLD}Verificando ferramentas DNS...${NC}"
+    echo "═══════════════════"
+    
+    local tools_needed=()
+    local tools_available=()
+    
+    # Verificar quais ferramentas estão disponíveis
+    if command_exists dig; then
+        tools_available+=("dig")
+    else
+        tools_needed+=("bind")
+    fi
+    
+    if command_exists host; then
+        tools_available+=("host")
+    else
+        tools_needed+=("inetutils")
+    fi
+    
+    if command_exists nslookup; then
+        tools_available+=("nslookup")
+    fi
+    
+    # Mostrar status
+    if [[ ${#tools_available[@]} -gt 0 ]]; then
+        echo -e "   ${GREEN}✓ Ferramentas disponíveis: ${tools_available[*]}${NC}"
+    fi
+    
+    if [[ ${#tools_needed[@]} -gt 0 ]]; then
+        echo -e "   ${YELLOW}⚠ Ferramentas necessárias: ${tools_needed[*]}${NC}"
+        
+        if command_exists pacman; then
+            echo -e "\n${CYAN}Instalando ferramentas DNS...${NC}"
+            
+            for tool in "${tools_needed[@]}"; do
+                case "$tool" in
+                    "bind")
+                        echo "   Instalando bind (para dig)..."
+                        sudo pacman -S --noconfirm bind >/dev/null 2>&1 || echo "   ⚠ Falha ao instalar bind"
+                        ;;
+                    "inetutils")
+                        echo "   Instalando inetutils (para host)..."
+                        sudo pacman -S --noconfirm inetutils >/dev/null 2>&1 || echo "   ⚠ Falha ao instalar inetutils"
+                        ;;
+                esac
+            done
+            
+            echo -e "   ${GREEN}✓ Instalação concluída${NC}"
+        else
+            echo -e "   ${RED}✗ pacman não encontrado. Instale manualmente:${NC}"
+            echo "   sudo pacman -S bind inetutils"
+        fi
+    fi
+    
+    # Verificar novamente após instalação
+    local final_tools=()
+    if command_exists dig; then final_tools+=("dig"); fi
+    if command_exists host; then final_tools+=("host"); fi
+    if command_exists nslookup; then final_tools+=("nslookup"); fi
+    
+    if [[ ${#final_tools[@]} -gt 0 ]]; then
+        echo -e "   ${GREEN}✓ Ferramentas DNS disponíveis: ${final_tools[*]}${NC}"
+        return 0
+    else
+        echo -e "   ${RED}✗ Nenhuma ferramenta DNS disponível${NC}"
+        return 1
+    fi
+}
+
 # Função principal
 main() {
     echo "Este script vai:"
-    echo "1) Mostrar o status atual do DNS"
-    echo "2) Aplicar correções se necessário"
-    echo "3) Testar o 1Password CLI"
+    echo "1) Verificar e instalar ferramentas DNS se necessário"
+    echo "2) Mostrar o status atual do DNS"
+    echo "3) Aplicar correções se necessário"
+    echo "4) Testar o 1Password CLI"
     echo
+    
+    # Sempre verificar dependências primeiro
+    install_dns_tools
     
     if [[ "${1:-}" == "--fix" ]]; then
         echo -e "${YELLOW}Modo correção automática ativado${NC}"
