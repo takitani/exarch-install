@@ -166,7 +166,7 @@ show_menu() {
   
   # Show XPS menu if: hardware contains XPS, or FORCE_XPS is set, or is_xps_mode returns true
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]] || is_xps_mode; then
-    show_menu_category "Dell XPS 13 Plus" "95" \
+    show_menu_category "Dell XPS 13 Plus" "100" \
       "SETUP_DELL_XPS_9320:XPS 13 Plus optimizations (webcam, power)" \
       "SETUP_DUAL_KEYBOARD:Dual keyboard support (BR+US)"
   fi
@@ -812,7 +812,7 @@ toggle_option() {
     70) toggle_ai_cli_group ;;
     80) toggle_virtual_env_group ;;
     90) toggle_system_config_group ;;
-    95) toggle_dell_xps_group ;;
+    100) toggle_dell_xps_group ;;
     
     # Individual toggles
     0) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
