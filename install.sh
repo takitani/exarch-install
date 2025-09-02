@@ -2,8 +2,59 @@
 # Exarch Scripts - Post-installation setup for Omarchy Linux
 # Modular architecture with clean separation of concerns
 
-# Get script directory
+# Bootstrap function for remote execution
+bootstrap_remote() {
+  # Colors for output
+  local RED='\033[0;31m'
+  local GREEN='\033[0;32m'
+  local BLUE='\033[0;34m'
+  local BOLD='\033[1m'
+  local NC='\033[0m'
+  
+  echo -e "${BOLD}🚀 Exarch Scripts - Remote Bootstrap${NC}"
+  echo "Detected remote execution, downloading full repository..."
+  echo
+  
+  # Repository details
+  local REPO_URL="https://github.com/takitani/exarch-install"
+  local TEMP_DIR="/tmp/exarch-scripts-$$"
+  
+  # Check for required tools
+  if ! command -v git &> /dev/null; then
+    echo -e "${RED}[ERROR]${NC} git is required but not installed. Please install git first: sudo pacman -S git"
+    exit 1
+  fi
+  
+  # Create temporary directory
+  mkdir -p "$TEMP_DIR"
+  
+  # Clone the repository
+  echo -e "${BLUE}[INFO]${NC} Cloning repository..."
+  if ! git clone "$REPO_URL" "$TEMP_DIR/exarch-install" >/dev/null 2>&1; then
+    echo -e "${RED}[ERROR]${NC} Failed to clone repository"
+    exit 1
+  fi
+  
+  # Change to the repository directory and execute
+  cd "$TEMP_DIR/exarch-install"
+  chmod +x install.sh
+  
+  echo -e "${GREEN}[SUCCESS]${NC} Repository downloaded, executing script..."
+  echo
+  
+  # Execute with all original arguments
+  exec ./install.sh "$@"
+}
+
+# Detect if running remotely (via curl/wget)
+# Check if script directory doesn't contain expected files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# If we're in /dev/fd or missing core files, we're running remotely
+if [[ "$SCRIPT_DIR" == "/dev/fd" ]] || [[ ! -f "$SCRIPT_DIR/lib/core.sh" ]]; then
+  bootstrap_remote "$@"
+  exit $?
+fi
 
 # Source core libraries
 source "$SCRIPT_DIR/lib/core.sh"
