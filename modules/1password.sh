@@ -697,6 +697,13 @@ setup_1password_complete() {
                 # Test with verbose op command
                 echo "Debug: Running op with detailed error output..."
                 
+                # Try with environment variables that might help
+                echo "Debug: Trying with SSL/network environment variables..."
+                export CURL_CA_BUNDLE=""
+                export SSL_CERT_DIR=""
+                export SSL_CERT_FILE=""
+                export OP_LOG_LEVEL="debug"
+                
                 if op account add --address "$address" --email "$email"; then
                   if signin_1password_cli; then
                     success "Basic manual configuration completed successfully!"
@@ -730,8 +737,39 @@ setup_1password_complete() {
                     warn "⚠️ SSL certificate issue detected"
                   fi
                   
-                  if ! ask_yes_no "Try a different configuration method?"; then
-                    return 1
+                  echo "Since basic manual configuration failed, let's try the interactive helper instead."
+                  if ask_yes_no "Run the interactive 1Password helper (recommended)?"; then
+                    # Try to find and run the helper
+                    local helper_paths=(
+                      "./helpers/1password-helper.sh"
+                      "$SCRIPT_DIR/helpers/1password-helper.sh"
+                      "$(dirname "${BASH_SOURCE[0]}")/../helpers/1password-helper.sh"
+                    )
+                    
+                    local helper_found=false
+                    for helper_path in "${helper_paths[@]}"; do
+                      if [[ -x "$helper_path" ]]; then
+                        info "Running interactive helper: $helper_path"
+                        if "$helper_path"; then
+                          success "Interactive helper completed successfully!"
+                          return 0
+                        else
+                          err "Interactive helper also failed"
+                          return 1
+                        fi
+                        helper_found=true
+                        break
+                      fi
+                    done
+                    
+                    if [[ "$helper_found" == "false" ]]; then
+                      err "Interactive helper not found at expected locations"
+                      return 1
+                    fi
+                  else
+                    if ! ask_yes_no "Try a different configuration method?"; then
+                      return 1
+                    fi
                   fi
                 fi
               else
