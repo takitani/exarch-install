@@ -220,7 +220,7 @@ show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
   echo -e "  ${CYAN}0-37${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
-  echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
+  echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}dns${NC} DNS Safe Mode   ${CYAN}q${NC} Quit"
   
   if is_debug_mode; then
     echo -e "  ${YELLOW}DEBUG MODE ACTIVE${NC}"
@@ -301,6 +301,17 @@ interactive_menu() {
         echo
         echo "Press Enter to continue..."
         read -r
+        ;;
+      "dns")
+        if [[ "${DNS_SAFE_MODE:-true}" == "true" ]]; then
+          DNS_SAFE_MODE=false
+          echo -e "${YELLOW}⚠️  DNS Safe Mode DISABLED - may modify DNS if needed${NC}"
+        else
+          DNS_SAFE_MODE=true
+          echo -e "${GREEN}✓ DNS Safe Mode ENABLED - will not modify DNS${NC}"
+        fi
+        echo -e "Current status: ${DNS_SAFE_MODE:-true}"
+        sleep 2
         ;;
       "q")
         echo "Goodbye!"
@@ -936,35 +947,62 @@ perform_pre_installation_checks() {
 setup_installation_environment() {
   info "Setting up installation environment..."
   
-  # Check if systemd-resolved is working properly before modifying DNS
-  local dns_working=false
-  
-  # Test if systemd-resolved is managing DNS properly
-  if command_exists resolvectl && resolvectl status >/dev/null 2>&1; then
-    # Check if systemd-resolved is in managed mode and working
-    if resolvectl status 2>/dev/null | grep -q "resolv.conf mode: managed" && \
-       resolvectl status 2>/dev/null | grep -q "Current DNS Server:"; then
-      dns_working=true
-      info "systemd-resolved is working properly, skipping DNS modifications"
+  # DNS Safe Mode - don't modify DNS if enabled
+  if [[ "${DNS_SAFE_MODE:-true}" == "true" ]]; then
+    info "DNS Safe Mode enabled - will not modify DNS configuration"
+    info "Using existing network configuration from the system"
+    
+    # Test if current DNS is working
+    if command_exists nslookup; then
+      if timeout 5 nslookup google.com >/dev/null 2>&1; then
+        success "Current DNS configuration is working properly"
+      else
+        warn "Current DNS configuration may have issues, but DNS Safe Mode prevents modifications"
+        warn "You can disable DNS Safe Mode if you need DNS fixes during installation"
+      fi
+    elif command_exists dig; then
+      if timeout 5 dig google.com +short >/dev/null 2>&1; then
+        success "Current DNS configuration is working properly"
+      else
+        warn "Current DNS configuration may have issues, but DNS Safe Mode prevents modifications"
+        warn "You can disable DNS Safe Mode if you need DNS fixes during installation"
+      fi
+    else
+      info "DNS testing tools not available, proceeding with current configuration"
     fi
-  fi
-  
-  # Setup temporary DNS only if systemd-resolved is not working and DNS_SERVERS is configured
-  if [[ "$dns_working" == "false" ]] && [[ "${#DNS_SERVERS[@]}" -gt 0 ]] && [[ ! -f "/tmp/resolv.conf.backup" ]]; then
-    info "Configuring temporary DNS..."
-    add_sudo_command "cp /etc/resolv.conf /tmp/resolv.conf.backup"
+  else
+    info "DNS Safe Mode disabled - may modify DNS if needed"
     
-    # Create DNS configuration
-    local dns_config="/tmp/dns_config_$$"
-    {
-      echo "# Temporary DNS for installation"
-      for dns in "${DNS_SERVERS[@]}"; do
-        echo "nameserver $dns"
-      done
-    } > "$dns_config"
+    # Check if systemd-resolved is working properly before modifying DNS
+    local dns_working=false
     
-    add_sudo_command "cp $dns_config /etc/resolv.conf"
-    add_sudo_command "rm -f $dns_config"
+    # Test if systemd-resolved is managing DNS properly
+    if command_exists resolvectl && resolvectl status >/dev/null 2>&1; then
+      # Check if systemd-resolved is in managed mode and working
+      if resolvectl status 2>/dev/null | grep -q "resolv.conf mode: managed" && \
+         resolvectl status 2>/dev/null | grep -q "Current DNS Server:"; then
+        dns_working=true
+        info "systemd-resolved is working properly, skipping DNS modifications"
+      fi
+    fi
+    
+    # Setup temporary DNS only if systemd-resolved is not working and DNS_SERVERS is configured
+    if [[ "$dns_working" == "false" ]] && [[ "${#DNS_SERVERS[@]}" -gt 0 ]] && [[ ! -f "/tmp/resolv.conf.backup" ]]; then
+      info "Configuring temporary DNS..."
+      add_sudo_command "cp /etc/resolv.conf /tmp/resolv.conf.backup"
+      
+      # Create DNS configuration
+      local dns_config="/tmp/dns_config_$$"
+      {
+        echo "# Temporary DNS for installation"
+        for dns in "${DNS_SERVERS[@]}"; do
+          echo "nameserver $dns"
+        done
+      } > "$dns_config"
+      
+      add_sudo_command "cp $dns_config /etc/resolv.conf"
+      add_sudo_command "rm -f $dns_config"
+    fi
   fi
   
   # Update package databases if configured
@@ -1175,8 +1213,8 @@ perform_post_installation_tasks() {
     yay -Sc --noconfirm >/dev/null 2>&1 || true
   fi
   
-  # Restore DNS configuration only if we modified it
-  if [[ -f "/tmp/resolv.conf.backup" ]]; then
+  # Restore DNS configuration only if we modified it (and DNS Safe Mode is disabled)
+  if [[ -f "/tmp/resolv.conf.backup" ]] && [[ "${DNS_SAFE_MODE:-true}" != "true" ]]; then
     info "Restoring DNS configuration..."
     
     # Check if systemd-resolved is working properly now
@@ -1195,6 +1233,9 @@ perform_post_installation_tasks() {
       info "Restoring original DNS configuration..."
       sudo mv /tmp/resolv.conf.backup /etc/resolv.conf
     fi
+  elif [[ -f "/tmp/resolv.conf.backup" ]] && [[ "${DNS_SAFE_MODE:-true}" == "true" ]]; then
+    info "DNS Safe Mode enabled - removing DNS backup file (no modifications were made)"
+    sudo rm -f "/tmp/resolv.conf.backup"
   fi
   
   success "Post-installation tasks completed"
