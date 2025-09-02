@@ -13,6 +13,11 @@ RED='\033[0;31m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Função para verificar se comando existe
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
 echo -e "${BOLD}Teste e Correção de DNS${NC}"
 echo -e "${CYAN}═══════════════════════════════════════${NC}"
@@ -50,6 +55,19 @@ show_status() {
         echo -e "   ${GREEN}✓ DNS funcionando${NC}"
     else
         echo -e "   ${RED}✗ DNS falhando${NC}"
+        echo "   Tentando com curl..."
+        if curl -s --connect-timeout 5 "https://google.com" >/dev/null 2>&1; then
+            echo -e "   ${YELLOW}⚠ curl funciona, mas nslookup falha${NC}"
+        else
+            echo -e "   ${RED}✗ curl também falha${NC}"
+        fi
+    fi
+    
+    echo -e "\n${CYAN}5. Verificação de conectividade:${NC}"
+    if ping -c 1 8.8.8.8 >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✓ Conectividade IP OK${NC}"
+    else
+        echo -e "   ${RED}✗ Sem conectividade IP${NC}"
     fi
 }
 
@@ -65,9 +83,16 @@ fix_dns() {
         sudo systemctl enable systemd-resolved
     fi
     
-    # 2. Forçar modo managed
-    echo "2. Configurando systemd-resolved para modo managed..."
-    sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+    # 2. Verificar se está em modo stub (problema comum)
+    if [[ -L /etc/resolv.conf ]] && [[ "$(readlink /etc/resolv.conf)" == "/run/systemd/resolve/stub-resolv.conf" ]]; then
+        echo "2. Detectado modo stub, configurando para modo managed..."
+        sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    elif [[ -L /etc/resolv.conf ]] && [[ "$(readlink /etc/resolv.conf)" == "/run/systemd/resolve/resolv.conf" ]]; then
+        echo "2. Já em modo managed, verificando configuração..."
+    else
+        echo "2. Configurando systemd-resolved para modo managed..."
+        sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+    fi
     
     # 3. Reiniciar o serviço
     echo "3. Reiniciando systemd-resolved..."
@@ -83,6 +108,25 @@ fix_dns() {
         echo -e "   ${GREEN}✓ Modo managed ativado${NC}"
     else
         echo -e "   ${YELLOW}⚠ Ainda não em modo managed${NC}"
+    fi
+    
+    # 6. Testar DNS
+    echo "6. Testando DNS..."
+    if nslookup google.com >/dev/null 2>&1; then
+        echo -e "   ${GREEN}✓ DNS funcionando após correção${NC}"
+    else
+        echo -e "   ${YELLOW}⚠ DNS ainda com problemas${NC}"
+        echo "   Tentando configuração manual..."
+        
+        # Backup do resolv.conf atual
+        sudo cp /etc/resolv.conf /etc/resolv.conf.backup.$(date +%Y%m%d_%H%M%S)
+        
+        # Criar resolv.conf manual com DNS público
+        echo "# DNS manual para correção" | sudo tee /etc/resolv.conf >/dev/null
+        echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf >/dev/null
+        echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
+        
+        echo "   DNS público configurado temporariamente"
     fi
 }
 
@@ -110,9 +154,9 @@ test_1password() {
 # Função principal
 main() {
     echo "Este script vai:"
-    echo "1. Mostrar o status atual do DNS"
-    echo "2. Aplicar correções se necessário"
-    echo "3. Testar o 1Password CLI"
+    echo "1) Mostrar o status atual do DNS"
+    echo "2) Aplicar correções se necessário"
+    echo "3) Testar o 1Password CLI"
     echo
     
     if [[ "${1:-}" == "--fix" ]]; then
