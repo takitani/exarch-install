@@ -149,6 +149,11 @@ is_remmina_test_mode() {
   [[ "${TEST_REMMINA_MODE:-false}" == "true" ]]
 }
 
+# Check if we're running in Windows Docker test mode
+is_windows_docker_mode() {
+  [[ "${TEST_WINDOCKER_MODE:-false}" == "true" ]]
+}
+
 # Check if command exists
 command_exists() {
   command -v "$1" >/dev/null 2>&1

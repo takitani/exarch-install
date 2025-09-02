@@ -75,6 +75,7 @@ source "$SCRIPT_DIR/modules/remmina.sh"
 source "$SCRIPT_DIR/modules/pipewire-camera.sh"
 source "$SCRIPT_DIR/modules/espanso.sh"
 source "$SCRIPT_DIR/modules/gnome-keyring.sh"
+source "$SCRIPT_DIR/modules/windows-docker.sh"
 
 # ======================================
 # MENU SYSTEM
@@ -140,6 +141,9 @@ show_menu() {
     "INSTALL_CLAUDE_CODE:Claude Code CLI" \
     "INSTALL_CODEX_CLI:Codex CLI" \
     "INSTALL_GEMINI_CLI:Gemini CLI"
+    
+  show_menu_category "Virtual Environments" \
+    "INSTALL_WINDOWS_DOCKER:Windows 11 via Docker (with app integration)"
     
   show_menu_category "System Configuration" \
     "SYNC_HYPR_CONFIGS:Sync Hypr configs" \
@@ -211,7 +215,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-34${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}0-35${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
@@ -225,6 +229,10 @@ show_menu_controls() {
   
   if is_remmina_test_mode; then
     echo -e "  ${CYAN}REMMINA DEBUG MODE${NC}"
+  fi
+  
+  if is_windows_docker_mode; then
+    echo -e "  ${CYAN}WINDOWS DOCKER MODE${NC}"
   fi
   
 }
@@ -337,6 +345,7 @@ apply_profile() {
       INSTALL_CLAUDE_CODE=true
       INSTALL_CODEX_CLI=true
       INSTALL_GEMINI_CLI=true
+      INSTALL_WINDOWS_DOCKER=true
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=true
       INSTALL_AGE=true
@@ -373,6 +382,7 @@ apply_profile() {
       INSTALL_CLAUDE_CODE=false
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
+      INSTALL_WINDOWS_DOCKER=false
       SYNC_HYPR_CONFIGS=false
       SETUP_SHELL_IMPROVEMENTS=false
       INSTALL_CHEZMOI=false
@@ -412,6 +422,7 @@ apply_profile() {
       INSTALL_CLAUDE_CODE=true
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
+      INSTALL_WINDOWS_DOCKER=false
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -481,6 +492,7 @@ apply_profile() {
       INSTALL_CLAUDE_CODE=false
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
+      INSTALL_WINDOWS_DOCKER=false
       SYNC_HYPR_CONFIGS=false
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -518,6 +530,7 @@ apply_profile() {
       INSTALL_CLAUDE_CODE=true
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
+      INSTALL_WINDOWS_DOCKER=false
       SYNC_HYPR_CONFIGS=true
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
@@ -565,18 +578,19 @@ toggle_option() {
     20) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
     21) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
     22) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    23) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    24) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
-    25) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    26) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    27) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    28) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    29) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
-    30) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    31) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
-    32) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
-    33) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    34) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    23) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
+    24) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    25) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    26) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    27) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    28) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    29) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    30) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    31) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    32) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
+    33) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
+    34) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    35) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -968,6 +982,11 @@ execute_installation_modules() {
     setup_gnome_keyring
   fi
   
+  # Windows Docker setup
+  if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]]; then
+    setup_windows_docker_complete
+  fi
+  
   # Wait for all background jobs to complete
   wait_for_background_jobs
   
@@ -1226,6 +1245,11 @@ main() {
   
   if is_remmina_test_mode; then
     test_remmina_mode
+    exit $?
+  fi
+  
+  if is_windows_docker_mode; then
+    test_windows_docker_mode
     exit $?
   fi
   

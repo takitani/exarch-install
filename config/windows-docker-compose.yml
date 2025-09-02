@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  windows11:
+    image: dockurr/windows
+    container_name: windows11-exarch
+    environment:
+      VERSION: "11"
+      DISK_SIZE: "64G"
+      RAM: "8G"
+      CPU_CORES: "4"
+      LANGUAGE: "en-US"        # English International
+      KEYBOARD: "en-US"        # US International keyboard
+      USERNAME: "User"
+      PASSWORD: "ExarchWin11"  # Default password
+      MANUAL: "N"             # Automatic installation
+      VERIFY: "N"             # Skip ISO verification for faster startup
+    devices:
+      - /dev/kvm:/dev/kvm     # Hardware acceleration (if available)
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "8006:8006"  # Web viewer
+      - "3389:3389"  # RDP
+    volumes:
+      - windows_data:/storage
+      - /home/${USER}:/shared  # Share Linux home directory
+    restart: unless-stopped
+    networks:
+      - windows_network
+
+volumes:
+  windows_data:
+    driver: local
+
+networks:
+  windows_network:
+    driver: bridge

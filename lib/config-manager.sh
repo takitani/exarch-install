@@ -205,6 +205,10 @@ parse_command_line() {
         TEST_REMMINA_MODE=true
         info "🖥️ REMMINA DEBUG MODE - Testing RDP connection generation"
         ;;
+      --windocker)
+        TEST_WINDOCKER_MODE=true
+        info "🪟 WINDOWS DOCKER MODE - Installing Windows 11 via Docker only"
+        ;;
       --help|-h)
         show_help
         exit 0
@@ -233,6 +237,7 @@ show_help() {
   echo "  --1pass     Test 1Password .pgpass configuration only"
   echo "  --sync-ssh  Test SSH key synchronization from 1Password"
   echo "  --remmina   Test Remmina RDP connection generation (creates sample files)"
+  echo "  --windocker Install Windows 11 via Docker only"
   echo "  --help, -h  Show this help message"
   echo
   echo "Configuration:"
