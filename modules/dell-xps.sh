@@ -967,15 +967,7 @@ show_dell_xps_post_install_info() {
   echo
 }
 
-# Export functions
-export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
-export -f install_ipu6_drivers configure_dell_xps_kernel_modules
-export -f install_dell_xps_power_management configure_tlp_dell_xps
-export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
-export -f setup_dual_keyboard_dell_xps install_dell_utilities
-export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
-export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services
-export -f create_dell_xps_shutdown_hook create_dell_xps_shutdown_service configure_dell_xps_kernel_params
+# Functions will be exported at the end of the file after all definitions
 
 # Create TLP systemd service manually
 create_tlp_service() {
@@ -1197,3 +1189,13 @@ cleanup_dell_xps_services() {
   
   success "Cleanup completed - safe to reboot"
 }
+
+# Export all functions at the end after they are defined
+export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
+export -f install_ipu6_drivers configure_dell_xps_kernel_modules
+export -f install_dell_xps_power_management configure_tlp_dell_xps
+export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
+export -f setup_dual_keyboard_dell_xps install_dell_utilities
+export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
+export -f create_tlp_service create_thermald_service create_fwupd_service create_tlp_config cleanup_dell_xps_services
+export -f create_dell_xps_shutdown_hook create_dell_xps_shutdown_service configure_dell_xps_kernel_params
