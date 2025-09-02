@@ -157,7 +157,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-30${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}0-33${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
@@ -319,10 +319,12 @@ apply_profile() {
       INSTALL_CODEX_CLI=false
       INSTALL_GEMINI_CLI=false
       SYNC_HYPR_CONFIGS=false
+      SETUP_SHELL_IMPROVEMENTS=false
       INSTALL_CHEZMOI=false
       INSTALL_AGE=false
       SETUP_DOTFILES_MANAGEMENT=false
       SETUP_DEV_PGPASS=false
+      SETUP_SSH_KEYS=false
       SETUP_DELL_XPS_9320=false
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=false
@@ -513,9 +515,11 @@ toggle_option() {
     26) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
     27) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
     28) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    29) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    30) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    31) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    29) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    30) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    31) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
+    32) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    33) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
