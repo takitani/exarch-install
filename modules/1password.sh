@@ -13,6 +13,32 @@
 # OP_DEVICE=false  # Prevent device authentication (CLI-only mode)
 export ONEPASSWORD_CLI_ONLY="${ONEPASSWORD_CLI_ONLY:-false}"  # CLI-only mode flag
 
+# Function to auto-enable 1Password related features
+auto_enable_1password_features() {
+  local feature="$1"
+  
+  case "$feature" in
+    "pgpass")
+      if [[ "${SETUP_DEV_PGPASS:-false}" != "true" ]]; then
+        info "Auto-enabling .pgpass generation (requires 1Password CLI)"
+        export SETUP_DEV_PGPASS=true
+      fi
+      ;;
+    "remmina")
+      if [[ "${SETUP_REMMINA_CONNECTIONS:-false}" != "true" ]]; then
+        info "Auto-enabling Remmina connections (requires 1Password CLI)"
+        export SETUP_REMMINA_CONNECTIONS=true
+      fi
+      ;;
+    "ssh_keys")
+      if [[ "${SETUP_SSH_KEYS:-false}" != "true" ]]; then
+        info "Auto-enabling SSH key management (requires 1Password CLI)"
+        export SETUP_SSH_KEYS=true
+      fi
+      ;;
+  esac
+}
+
 # 1Password CLI Installation and Setup
 install_1password_cli() {
   info "Installing 1Password CLI..."
@@ -190,20 +216,15 @@ configure_1password_mobile_desktop() {
   if ! detect_1password_desktop; then
     warn "1Password desktop is not installed."
     echo
-    echo "To use the mobile flow, you need to install it first:"
-    echo -e "• Via AUR: ${CYAN}yay -S 1password${NC}"
-    echo -e "• Via Flatpak: ${CYAN}flatpak install com.onepassword.OnePassword${NC}"
-    echo
+    echo "This flow requires the desktop app. Installing automatically..."
     
-    if ask_yes_no "Install automatically via AUR?"; then
-      if install_1password_desktop; then
-        success "1Password desktop installed"
-      else
-        err "Automatic installation failed. Please install manually and try again."
-        return 1
-      fi
+    if install_1password_desktop; then
+      success "1Password desktop installed successfully"
     else
-      err "Please install manually and try again"
+      err "Failed to install 1Password desktop automatically"
+      echo "Please install manually and try again:"
+      echo -e "• Via AUR: ${CYAN}yay -S 1password${NC}"
+      echo -e "• Via Flatpak: ${CYAN}flatpak install com.onepassword.OnePassword${NC}"
       return 1
     fi
   else
@@ -439,12 +460,31 @@ configure_1password_cli_direct() {
 
 # Main 1Password setup function
 setup_1password_complete() {
-  if [[ "${SETUP_DEV_PGPASS:-false}" != "true" ]]; then
-    info "Skipping 1Password .pgpass configuration (not selected)"
+  # Check if 1Password is needed for any feature
+  local needs_1password=false
+  
+  if [[ "${SETUP_DEV_PGPASS:-false}" == "true" ]]; then
+    needs_1password=true
+    info "1Password CLI required for .pgpass generation"
+  fi
+  
+  if [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]; then
+    needs_1password=true
+    info "1Password CLI required for Remmina connections"
+  fi
+  
+  if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
+    needs_1password=true
+    info "1Password CLI required for SSH key management"
+  fi
+  
+  # If no 1Password features are enabled, skip installation
+  if [[ "$needs_1password" == "false" ]]; then
+    info "No 1Password features enabled, skipping installation"
     return 0
   fi
-
-  info "Configuring dev environment (.pgpass via 1Password)..."
+  
+  info "1Password integration required for selected features..."
   
   # Install dependencies
   if ! command_exists jq; then
@@ -455,9 +495,9 @@ setup_1password_complete() {
     fi
   fi
   
-  # Install 1Password CLI
+  # Install 1Password CLI only when needed
   if ! install_1password_cli; then
-    err "1Password CLI required for .pgpass generation"
+    err "1Password CLI required for selected features"
     return 1
   fi
   
