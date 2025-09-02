@@ -134,7 +134,7 @@ fi
 
 if ! grep -q "pam_gnome_keyring.so" /etc/pam.d/login; then
     echo "• PAM não está configurado. Execute:"
-    echo "  ./setup-gnome-keyring.sh"
+    echo "  ./helpers/setup-gnome-keyring.sh"
     PROBLEMS=$((PROBLEMS + 1))
 fi
 
@@ -155,4 +155,4 @@ if [ $PROBLEMS -eq 0 ]; then
 fi
 
 echo ""
-echo "Para mais informações, execute: ./setup-gnome-keyring.sh --help"
+echo "Para mais informações, execute: ./helpers/setup-gnome-keyring.sh --help"

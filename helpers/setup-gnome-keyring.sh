@@ -166,7 +166,7 @@ EOF
     echo "✓ Keyring 'login' sem senha criado e definido como padrão!"
 else
     echo -e "\nPara criar manualmente um keyring sem senha:"
-    echo "1. Execute: ./create-blank-keyring.sh"
+    echo "1. Execute: ./helpers/create-blank-keyring.sh"
     echo "2. Ou se tiver o seahorse instalado:"
     echo "   - Abra o seahorse (Senhas e Chaves)"
     echo "   - Crie um novo keyring chamado 'login'"

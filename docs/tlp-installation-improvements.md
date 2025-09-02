@@ -91,7 +91,7 @@ The improved system is automatically used when running:
 ### Manual Testing
 Test the new system with:
 ```bash
-./test-tlp-installation.sh
+./helpers/test-tlp-installation.sh
 ```
 
 ## Benefits
@@ -153,5 +153,5 @@ The system has been tested with:
 ## Files Modified
 
 - `modules/dell-xps.sh` - Main implementation
-- `test-tlp-installation.sh` - Test script
+- `test-tlp-installation.sh` - Test script (moved to helpers/)
 - `docs/tlp-installation-improvements.md` - This documentation
