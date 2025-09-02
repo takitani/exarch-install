@@ -106,27 +106,27 @@ show_menu() {
   echo
   
   # Package categories
-  show_menu_category "Web Browsers" \
+  show_menu_category "Web Browsers" "10" \
     "INSTALL_GOOGLE_CHROME:Google Chrome" \
     "INSTALL_FIREFOX:Firefox"
     
-  show_menu_category "Productivity Tools" \
+  show_menu_category "Productivity Tools" "20" \
     "INSTALL_COPYQ:CopyQ clipboard manager" \
     "INSTALL_DROPBOX:Dropbox" \
     "INSTALL_AWS_VPN:AWS VPN Client" \
     "INSTALL_ESPANSO:Espanso text expander"
     
-  show_menu_category "Development Tools" \
+  show_menu_category "Development Tools" "30" \
     "INSTALL_POSTMAN:Postman API client" \
     "INSTALL_REMMINA:Remmina remote desktop" \
     "INSTALL_MISE_RUNTIMES:Node.js + .NET via mise"
     
-  show_menu_category "Text Editors" \
+  show_menu_category "Text Editors" "40" \
     "INSTALL_NANO:nano" \
     "INSTALL_MICRO:micro" \
     "INSTALL_KATE:Kate"
     
-  show_menu_category "Code Editors & IDEs" \
+  show_menu_category "Code Editors & IDEs" "50" \
     "INSTALL_VSCODE:Visual Studio Code" \
     "INSTALL_CURSOR:Cursor AI editor" \
     "INSTALL_WINDSURF:WindSurf editor" \
@@ -134,20 +134,20 @@ show_menu() {
     "INSTALL_JB_RIDER:JetBrains Rider" \
     "INSTALL_JB_DATAGRIP:DataGrip database IDE"
     
-  show_menu_category "Communication" \
+  show_menu_category "Communication" "60" \
     "INSTALL_SLACK:Slack" \
     "INSTALL_TEAMS:Microsoft Teams"
     
-  show_menu_category "AI & CLI Tools" \
+  show_menu_category "AI & CLI Tools" "70" \
     "INSTALL_CLAUDE_CODE:Claude Code CLI" \
     "INSTALL_CODEX_CLI:Codex CLI" \
     "INSTALL_GEMINI_CLI:Gemini CLI"
     
-  show_menu_category "Virtual Environments" \
+  show_menu_category "Virtual Environments" "80" \
     "INSTALL_WINDOWS_DOCKER:Windows 11 via Docker" \
     "INSTALL_WINAPPS_LAUNCHER:WinApps Launcher (Windows app integration)"
     
-  show_menu_category "System Configuration" \
+  show_menu_category "System Configuration" "90" \
     "SYNC_HYPR_CONFIGS:Sync Hypr configs" \
     "SETUP_SHELL_IMPROVEMENTS:Shell improvements (shared history)" \
     "INSTALL_CHEZMOI:chezmoi dotfiles manager" \
@@ -166,7 +166,7 @@ show_menu() {
   
   # Show XPS menu if: hardware contains XPS, or FORCE_XPS is set, or is_xps_mode returns true
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]] || is_xps_mode; then
-    show_menu_category "Dell XPS 13 Plus" \
+    show_menu_category "Dell XPS 13 Plus" "95" \
       "SETUP_DELL_XPS_9320:XPS 13 Plus optimizations (webcam, power)" \
       "SETUP_DUAL_KEYBOARD:Dual keyboard support (BR+US)"
   fi
@@ -178,13 +178,18 @@ show_menu() {
 # Global counter for menu items
 MENU_ITEM_COUNTER=0
 
-# Show a menu category with options
+# Show a menu category with options and group toggle
 show_menu_category() {
   local category_name="$1"
-  shift
+  local group_number="$2"
+  shift 2
   local options=("$@")
   
-  echo -e "${CYAN}$category_name:${NC}"
+  # Show category title with toggle number
+  echo -e "${CYAN}${BOLD}${group_number} - ${category_name}${NC}"
+  
+  # Calculate starting number for this group
+  local start_num=$((group_number + 1))
   
   for option in "${options[@]}"; do
     local var_name="${option%%:*}"
@@ -194,8 +199,8 @@ show_menu_category() {
     
     [[ "$value" == "true" ]] && status="✓"
     
-    printf "  ${BOLD}%2d${NC}. %s %s\n" "$MENU_ITEM_COUNTER" "$status" "$display_name"
-    ((MENU_ITEM_COUNTER++))
+    printf "  ${BOLD}%2d${NC}. %s %s\n" "$start_num" "$status" "$display_name"
+    ((start_num++))
   done
   
   echo
@@ -218,7 +223,7 @@ show_system_info_compact() {
 # Show menu controls
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
-  echo -e "  ${CYAN}0-37${NC} Toggle item   ${CYAN}Enter${NC} Install"
+  echo -e "  ${CYAN}10,20,30...${NC} Toggle group   ${CYAN}11,12,21,22...${NC} Toggle item   ${CYAN}Enter${NC} Install"
   echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}dns${NC} DNS Safe Mode   ${CYAN}q${NC} Quit"
   
@@ -572,11 +577,244 @@ apply_profile() {
   return 0
 }
 
+# ======================================
+# GROUP TOGGLE FUNCTIONS
+# ======================================
+
+# Toggle Web Browsers group
+toggle_web_browsers_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_GOOGLE_CHROME" "INSTALL_FIREFOX")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_GOOGLE_CHROME=false
+    INSTALL_FIREFOX=false
+    echo -e "${YELLOW}✗ Web Browsers group disabled${NC}"
+  else
+    INSTALL_GOOGLE_CHROME=true
+    INSTALL_FIREFOX=true
+    echo -e "${GREEN}✓ Web Browsers group enabled${NC}"
+  fi
+}
+
+# Toggle Productivity Tools group
+toggle_productivity_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_COPYQ" "INSTALL_DROPBOX" "INSTALL_AWS_VPN" "INSTALL_ESPANSO")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_COPYQ=false
+    INSTALL_DROPBOX=false
+    INSTALL_AWS_VPN=false
+    INSTALL_ESPANSO=false
+    echo -e "${YELLOW}✗ Productivity Tools group disabled${NC}"
+  else
+    INSTALL_COPYQ=true
+    INSTALL_DROPBOX=true
+    INSTALL_AWS_VPN=true
+    INSTALL_ESPANSO=true
+    echo -e "${GREEN}✓ Productivity Tools group enabled${NC}"
+  fi
+}
+
+# Toggle Development Tools group
+toggle_development_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_POSTMAN" "INSTALL_REMMINA" "INSTALL_MISE_RUNTIMES")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_POSTMAN=false
+    INSTALL_REMMINA=false
+    INSTALL_MISE_RUNTIMES=false
+    echo -e "${YELLOW}✗ Development Tools group disabled${NC}"
+  else
+    INSTALL_POSTMAN=true
+    INSTALL_REMMINA=true
+    INSTALL_MISE_RUNTIMES=true
+    echo -e "${GREEN}✓ Development Tools group enabled${NC}"
+  fi
+}
+
+# Toggle Text Editors group
+toggle_text_editors_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_NANO" "INSTALL_KATE")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_NANO=false
+    INSTALL_KATE=false
+    echo -e "${YELLOW}✗ Text Editors group disabled${NC}"
+  else
+    INSTALL_NANO=true
+    INSTALL_KATE=true
+    echo -e "${GREEN}✓ Text Editors group enabled${NC}"
+  fi
+}
+
+# Toggle Code Editors & IDEs group
+toggle_code_editors_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_VSCODE" "INSTALL_CURSOR" "INSTALL_WINDSURF" "INSTALL_JB_TOOLBOX" "INSTALL_JB_RIDER" "INSTALL_JB_DATAGRIP")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_VSCODE=false
+    INSTALL_CURSOR=false
+    INSTALL_WINDSURF=false
+    INSTALL_JB_TOOLBOX=false
+    INSTALL_JB_RIDER=false
+    INSTALL_JB_DATAGRIP=false
+    echo -e "${YELLOW}✗ Code Editors & IDEs group disabled${NC}"
+  else
+    INSTALL_VSCODE=true
+    INSTALL_CURSOR=true
+    INSTALL_WINDSURF=true
+    INSTALL_JB_TOOLBOX=true
+    INSTALL_JB_RIDER=true
+    INSTALL_JB_DATAGRIP=true
+    echo -e "${GREEN}✓ Code Editors & IDEs group enabled${NC}"
+  fi
+}
+
+# Toggle Communication group
+toggle_communication_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_SLACK" "INSTALL_TEAMS")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_SLACK=false
+    INSTALL_TEAMS=false
+    echo -e "${YELLOW}✗ Communication group disabled${NC}"
+  else
+    INSTALL_SLACK=true
+    INSTALL_TEAMS=true
+    echo -e "${GREEN}✓ Communication group enabled${NC}"
+  fi
+}
+
+# Toggle AI & CLI Tools group
+toggle_ai_cli_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_CLAUDE_CODE" "INSTALL_CODEX_CLI" "INSTALL_GEMINI_CLI")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_CLAUDE_CODE=false
+    INSTALL_CODEX_CLI=false
+    INSTALL_GEMINI_CLI=false
+    echo -e "${YELLOW}✗ AI & CLI Tools group disabled${NC}"
+  else
+    INSTALL_CLAUDE_CODE=true
+    INSTALL_CODEX_CLI=true
+    INSTALL_GEMINI_CLI=true
+    echo -e "${GREEN}✓ AI & CLI Tools group enabled${NC}"
+  fi
+}
+
+# Toggle Virtual Environments group
+toggle_virtual_env_group() {
+  local current_state
+  current_state=$(check_group_state "INSTALL_WINDOWS_DOCKER" "INSTALL_WINAPPS_LAUNCHER")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    INSTALL_WINDOWS_DOCKER=false
+    INSTALL_WINAPPS_LAUNCHER=false
+    echo -e "${YELLOW}✗ Virtual Environments group disabled${NC}"
+  else
+    INSTALL_WINDOWS_DOCKER=true
+    INSTALL_WINAPPS_LAUNCHER=true
+    echo -e "${GREEN}✓ Virtual Environments group enabled${NC}"
+  fi
+}
+
+# Toggle System Configuration group
+toggle_system_config_group() {
+  local current_state
+  current_state=$(check_group_state "SYNC_HYPR_CONFIGS" "SETUP_SHELL_IMPROVEMENTS" "INSTALL_CHEZMOI" "INSTALL_AGE" "SETUP_DOTFILES_MANAGEMENT" "SETUP_DEV_PGPASS" "SETUP_SSH_KEYS" "GENERATE_REMMINA_CONNECTIONS" "FIX_CURSOR_INPUT_METHOD" "SETUP_GNOME_KEYRING" "SETUP_PTBR_KEYBOARD_LAYOUT")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    SYNC_HYPR_CONFIGS=false
+    SETUP_SHELL_IMPROVEMENTS=false
+    INSTALL_CHEZMOI=false
+    INSTALL_AGE=false
+    SETUP_DOTFILES_MANAGEMENT=false
+    SETUP_DEV_PGPASS=false
+    SETUP_SSH_KEYS=false
+    GENERATE_REMMINA_CONNECTIONS=false
+    FIX_CURSOR_INPUT_METHOD=false
+    SETUP_GNOME_KEYRING=false
+    SETUP_PTBR_KEYBOARD_LAYOUT=false
+    echo -e "${YELLOW}✗ System Configuration group disabled${NC}"
+  else
+    SYNC_HYPR_CONFIGS=true
+    SETUP_SHELL_IMPROVEMENTS=true
+    INSTALL_CHEZMOI=true
+    INSTALL_AGE=true
+    SETUP_DOTFILES_MANAGEMENT=true
+    SETUP_DEV_PGPASS=true
+    SETUP_SSH_KEYS=true
+    GENERATE_REMMINA_CONNECTIONS=true
+    FIX_CURSOR_INPUT_METHOD=true
+    SETUP_GNOME_KEYRING=true
+    SETUP_PTBR_KEYBOARD_LAYOUT=true
+    echo -e "${GREEN}✓ System Configuration group enabled${NC}"
+  fi
+}
+
+# Toggle Dell XPS group
+toggle_dell_xps_group() {
+  local current_state
+  current_state=$(check_group_state "SETUP_DELL_XPS_9320" "SETUP_DUAL_KEYBOARD")
+  
+  if [[ "$current_state" == "all_true" ]]; then
+    SETUP_DELL_XPS_9320=false
+    SETUP_DUAL_KEYBOARD=false
+    echo -e "${YELLOW}✗ Dell XPS group disabled${NC}"
+  else
+    SETUP_DELL_XPS_9320=true
+    SETUP_DUAL_KEYBOARD=true
+    echo -e "${GREEN}✓ Dell XPS group enabled${NC}"
+  fi
+}
+
+# Helper function to check group state
+check_group_state() {
+  local all_true=true
+  local all_false=true
+  
+  for var in "$@"; do
+    if [[ "${!var}" == "true" ]]; then
+      all_false=false
+    else
+      all_true=false
+    fi
+  done
+  
+  if [[ "$all_true" == "true" ]]; then
+    echo "all_true"
+  elif [[ "$all_false" == "true" ]]; then
+    echo "all_false"
+  else
+    echo "mixed"
+  fi
+}
+
 # Toggle configuration option
 toggle_option() {
   local choice="$1"
   
   case "$choice" in
+    # Group toggles
+    10) toggle_web_browsers_group ;;
+    20) toggle_productivity_group ;;
+    30) toggle_development_group ;;
+    40) toggle_text_editors_group ;;
+    50) toggle_code_editors_group ;;
+    60) toggle_communication_group ;;
+    70) toggle_ai_cli_group ;;
+    80) toggle_virtual_env_group ;;
+    90) toggle_system_config_group ;;
+    95) toggle_dell_xps_group ;;
+    
+    # Individual toggles
     0) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
     1) INSTALL_FIREFOX=$([ "$INSTALL_FIREFOX" == true ] && echo false || echo true) ;;
     2) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
@@ -586,35 +824,34 @@ toggle_option() {
     6) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
     7) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
     8) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
-    9) INSTALL_MICRO=$([ "$INSTALL_MICRO" == true ] && echo false || echo true) ;;
-    10) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
+    9) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
     11) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
     12) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
     13) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
-    14) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
+    14) INSTALL_JB_RIDER=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
     15) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
     16) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
     17) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
     18) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
     19) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    20) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    21) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
-    22) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    23) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
-    24) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
-    25) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    26) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
-    27) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    28) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    29) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    30) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    31) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
-    32) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    33) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
-    34) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
-    35) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
-    36) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    37) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    21) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    22) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    23) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
+    24) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
+    25) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
+    26) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    27) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    28) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    29) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    31) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    32) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    33) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    34) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    35) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
+    36) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
+    37) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
+    38) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
+    39) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;

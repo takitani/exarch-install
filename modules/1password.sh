@@ -1290,7 +1290,7 @@ export -f install_1password_cli detect_1password_desktop install_1password_deskt
 export -f open_1password_desktop check_1password_status signin_1password_cli
 export -f configure_1password_mobile_desktop configure_1password_cli_direct
 export -f setup_1password_complete process_database_item generate_pgpass_file
-export -f test_1password_mode setup_ssh_keys_from_1password
+export -f test_1password_mode
 
 # SSH Key Management from 1Password
 setup_ssh_keys_from_1password() {
@@ -1746,3 +1746,6 @@ setup_ssh_agent() {
   
   success "SSH agent configured"
 }
+
+# Export the SSH key function
+export -f setup_ssh_keys_from_1password
