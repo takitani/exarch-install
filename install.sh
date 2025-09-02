@@ -832,20 +832,40 @@ collect_1password_config() {
   fi
   
   # Only ask for credentials if not authenticated
-  # 1Password account
-  if [[ -z "${ONEPASSWORD_ACCOUNT:-}" ]]; then
+  # 1Password account - use ONEPASSWORD_URL if available, clean format
+  local onepass_url="${ONEPASSWORD_URL:-${ONEPASSWORD_ACCOUNT:-}}"
+  if [[ -n "$onepass_url" ]]; then
+    # Clean URL format
+    onepass_url="${onepass_url#https://}"
+    onepass_url="${onepass_url#http://}"
+    onepass_url="${onepass_url%/}"
+    echo -e "1Password account: ${CYAN}${onepass_url}${NC} (from configuration)"
+    echo -n "Press ENTER to use this account, or type a different one: "
+    read -r user_input
+    if [[ -n "$user_input" ]]; then
+      ONEPASSWORD_ACCOUNT="$user_input"
+    else
+      ONEPASSWORD_ACCOUNT="$onepass_url"
+    fi
+  else
     echo -n "1Password account (e.g., myteam.1password.com): "
     read -r ONEPASSWORD_ACCOUNT
-  else
-    echo -e "1Password account: ${CYAN}${ONEPASSWORD_ACCOUNT}${NC} (from environment)"
   fi
   
   # 1Password email
-  if [[ -z "${ONEPASSWORD_EMAIL:-}" ]]; then
+  local onepass_email="${ONEPASSWORD_EMAIL:-}"
+  if [[ -n "$onepass_email" ]]; then
+    echo -e "1Password email: ${CYAN}${onepass_email}${NC} (from configuration)"
+    echo -n "Press ENTER to use this email, or type a different one: "
+    read -r user_email
+    if [[ -n "$user_email" ]]; then
+      ONEPASSWORD_EMAIL="$user_email"
+    else
+      ONEPASSWORD_EMAIL="$onepass_email"
+    fi
+  else
     echo -n "1Password email: "
     read -r ONEPASSWORD_EMAIL
-  else
-    echo -e "1Password email: ${CYAN}${ONEPASSWORD_EMAIL}${NC} (from environment)"
   fi
   
   echo
