@@ -669,6 +669,22 @@ generate_pgpass_file() {
   local pgpass_file="$HOME/.pgpass"
   local backup_file=""
   
+  # Workaround for DNS resolution issues with 1Password CLI
+  # The error "dial tcp: lookup my.1password.com on [::1]:53" suggests it's trying to use localhost as DNS
+  # This can happen when systemd-resolved is misconfigured or not running properly
+  
+  # Test DNS resolution first
+  if ! nslookup my.1password.com >/dev/null 2>&1; then
+    warn "DNS resolution issue detected, applying workaround..."
+    
+    # Temporarily add public DNS to resolv.conf if needed
+    if [[ -f /etc/resolv.conf ]] && ! grep -q "8.8.8.8\|1.1.1.1" /etc/resolv.conf; then
+      info "Adding temporary DNS servers..."
+      echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf >/dev/null
+      echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf >/dev/null
+    fi
+  fi
+  
   # Verify 1Password CLI is authenticated before proceeding
   if ! op account list >/dev/null 2>&1; then
     err "1Password CLI not authenticated. Cannot generate .pgpass file."
@@ -715,7 +731,7 @@ generate_pgpass_file() {
   
   # Process found credentials
   local db_count
-  db_count=$(echo "$db_items" | jq length)
+  db_count=$(echo "$db_items" | jq length 2>/dev/null || echo "0")
   
   if [[ "$db_count" -eq 0 ]]; then
     warn "No database credentials found"
