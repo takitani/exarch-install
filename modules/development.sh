@@ -5,6 +5,122 @@
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/core.sh"
 [[ -f "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/../lib/package-manager.sh"
 
+# Configure Cursor cedilla fix for Brazilian keyboards
+configure_cursor_cedilla_fix() {
+  info "Configuring cedilla fix for Cursor IDE..."
+  
+  local config_dir="${HOME}/.config"
+  local hypr_config="${config_dir}/hypr"
+  
+  # Create config directories if they don't exist
+  [[ ! -d "$config_dir" ]] && mkdir -p "$config_dir"
+  [[ ! -d "$hypr_config" ]] && mkdir -p "$hypr_config"
+  
+  # Create cursor-flags.conf
+  cat > "${config_dir}/cursor-flags.conf" << 'EOF'
+# Flags for Cursor to work with cedilla
+--enable-features=UseOzonePlatform
+--ozone-platform=x11
+EOF
+  success "Created cursor-flags.conf"
+  
+  # Create electron34-flags.conf
+  cat > "${config_dir}/electron34-flags.conf" << 'EOF'
+# Configuration for Electron to work with cedilla
+--gtk-version=4
+--enable-features=UseOzonePlatform
+--ozone-platform=x11
+EOF
+  success "Created electron34-flags.conf"
+  
+  # Create Hyprland cedilla configuration
+  cat > "${hypr_config}/cedilla-remap.conf" << 'EOF'
+# Remap configuration for cedilla to work in Hyprland
+# Add this line to your hyprland.conf: source = ~/.config/hypr/cedilla-remap.conf
+
+# Input configuration for Brazilian keyboard with cedilla
+input {
+    kb_layout = br
+    kb_variant = abnt2
+    kb_options = compose:ralt
+}
+EOF
+  success "Created Hyprland cedilla configuration"
+  
+  # Check if hyprland.conf exists and add source line if needed
+  local hypr_main="${hypr_config}/hyprland.conf"
+  if [[ -f "$hypr_main" ]]; then
+    if ! grep -q "cedilla-remap.conf" "$hypr_main"; then
+      echo "" >> "$hypr_main"
+      echo "# Cedilla fix for Brazilian keyboard" >> "$hypr_main"
+      echo "source = ~/.config/hypr/cedilla-remap.conf" >> "$hypr_main"
+      success "Added cedilla configuration to hyprland.conf"
+    else
+      info "Cedilla configuration already in hyprland.conf"
+    fi
+  else
+    warn "hyprland.conf not found - please add manually: source = ~/.config/hypr/cedilla-remap.conf"
+  fi
+  
+  # Create cursor wrapper script
+  local cursor_script="${HOME}/cursor-cedilla.sh"
+  cat > "$cursor_script" << 'EOF'
+#!/bin/bash
+# Cursor IDE with cedilla fix for Brazilian keyboards
+
+# Configure environment for pt_BR
+export LANG=pt_BR.UTF-8
+export LC_ALL=pt_BR.UTF-8
+export LC_CTYPE=pt_BR.UTF-8
+
+# Set keyboard layout for X11
+setxkbmap -model abnt2 -layout br -variant abnt2 2>/dev/null || true
+
+# Wayland specific settings
+if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+    export _JAVA_AWT_WM_NONREPARENTING=1
+    export QT_QPA_PLATFORM=wayland
+    export GDK_BACKEND=x11
+fi
+
+# Clear IM variables that might interfere
+unset GTK_IM_MODULE
+unset QT_IM_MODULE
+unset XMODIFIERS
+
+# Run Cursor forcing X11 backend
+GDK_BACKEND=x11 cursor --ozone-platform=x11 "$@"
+EOF
+  chmod +x "$cursor_script"
+  success "Created cursor-cedilla.sh wrapper script"
+  
+  # Create desktop entry for the wrapper
+  local desktop_file="${HOME}/.local/share/applications/cursor-cedilla.desktop"
+  mkdir -p "${HOME}/.local/share/applications"
+  cat > "$desktop_file" << EOF
+[Desktop Entry]
+Name=Cursor (Cedilla)
+Comment=Cursor IDE with Brazilian keyboard cedilla fix
+Exec=${cursor_script} %F
+Icon=cursor
+Type=Application
+Categories=Development;IDE;
+Terminal=false
+StartupNotify=true
+MimeType=text/plain;
+EOF
+  success "Created desktop entry for Cursor with cedilla fix"
+  
+  # Show instructions
+  echo
+  info "Cedilla fix for Cursor has been configured!"
+  info "You can now run Cursor with cedilla support using:"
+  echo "  ${cursor_script}"
+  info "Or use the 'Cursor (Cedilla)' desktop entry"
+  echo
+  info "Note: Close all Cursor instances and restart for changes to take effect"
+}
+
 # Install development editors
 install_development_editors() {
   info "Installing development editors..."
@@ -43,6 +159,11 @@ install_development_editors() {
   for editor in "${editors_to_install[@]}"; do
     start_background_job "$editor" "$editor" "aur"
   done
+  
+  # Configure Cursor cedilla fix if Cursor is being installed
+  if [[ "${INSTALL_CURSOR:-true}" == "true" ]]; then
+    configure_cursor_cedilla_fix
+  fi
   
   success "Development editors installation initiated"
 }
@@ -433,7 +554,7 @@ show_development_summary() {
 }
 
 # Export functions
-export -f install_development_editors install_jetbrains_ides install_claude_code
+export -f configure_cursor_cedilla_fix install_development_editors install_jetbrains_ides install_claude_code
 export -f install_ai_cli_tools configure_mise_runtimes configure_nodejs_runtime
 export -f configure_dotnet_runtime install_global_npm_packages install_development_tools
 export -f install_container_tools setup_development_environment configure_git

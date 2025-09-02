@@ -978,24 +978,15 @@ setup_ssh_keys_from_1password() {
     return 1
   fi
   
-  # Get SSH key name from user
-  local ssh_key_name=""
-  if [[ -n "${SSH_KEY_NAME:-}" ]]; then
-    ssh_key_name="$SSH_KEY_NAME"
-    info "Using SSH key name from configuration: $ssh_key_name"
-  else
-    echo
-    echo "Enter the name of your SSH key in 1Password:"
-    echo "Example: opiklocal, github-key, server-key, etc."
-    echo
-    echo -n "SSH Key name: "
-    read -r ssh_key_name
-  fi
+  # Get SSH key name from configuration (collected in confirmation step)
+  local ssh_key_name="${SSH_KEY_NAME:-}"
   
   if [[ -z "$ssh_key_name" ]]; then
-    err "SSH key name is required"
+    err "SSH key name is required. Please set SSH_KEY_NAME in configuration."
     return 1
   fi
+  
+  info "Using SSH key name from configuration: $ssh_key_name"
   
   # Search for the specific SSH key in 1Password with retry option
   while true; do

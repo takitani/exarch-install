@@ -36,9 +36,11 @@ DEFAULT_INSTALL_CHEZMOI=true
 DEFAULT_INSTALL_AGE=true
 DEFAULT_SETUP_DOTFILES_MANAGEMENT=true
 DEFAULT_SETUP_DEV_PGPASS=true
+DEFAULT_SETUP_SSH_KEYS=true
 DEFAULT_SETUP_REMMINA_CONNECTIONS=true
 DEFAULT_ENABLE_REMMINA_MODULE=true
 DEFAULT_GENERATE_REMMINA_CONNECTIONS=true
+DEFAULT_FIX_CURSOR_INPUT_METHOD=false
 
 # Runtime defaults
 DEFAULT_NODE="lts"
@@ -98,6 +100,7 @@ init_config_variables() {
   INSTALL_CODEX_CLI=${INSTALL_CODEX_CLI:-$DEFAULT_INSTALL_CODEX_CLI}
   INSTALL_GEMINI_CLI=${INSTALL_GEMINI_CLI:-$DEFAULT_INSTALL_GEMINI_CLI}
   SYNC_HYPR_CONFIGS=${SYNC_HYPR_CONFIGS:-$DEFAULT_SYNC_HYPR_CONFIGS}
+  SETUP_SSH_KEYS=${SETUP_SSH_KEYS:-$DEFAULT_SETUP_SSH_KEYS}
   
   # Auto-enable XPS options if XPS hardware is detected
   local hw_info
@@ -118,6 +121,7 @@ init_config_variables() {
   SETUP_REMMINA_CONNECTIONS=${SETUP_REMMINA_CONNECTIONS:-$DEFAULT_SETUP_REMMINA_CONNECTIONS}
   ENABLE_REMMINA_MODULE=${ENABLE_REMMINA_MODULE:-$DEFAULT_ENABLE_REMMINA_MODULE}
   GENERATE_REMMINA_CONNECTIONS=${GENERATE_REMMINA_CONNECTIONS:-$DEFAULT_GENERATE_REMMINA_CONNECTIONS}
+  FIX_CURSOR_INPUT_METHOD=${FIX_CURSOR_INPUT_METHOD:-$DEFAULT_FIX_CURSOR_INPUT_METHOD}
   
   # Runtime versions
   DEFAULT_NODE=${DEFAULT_NODE:-$DEFAULT_NODE}
@@ -150,11 +154,11 @@ validate_config() {
   if [[ "$SYNC_HYPR_CONFIGS" == true ]] && [[ "${TEST_1PASS_MODE:-false}" == false ]] && [[ "${TEST_REMMINA_MODE:-false}" == false ]]; then
     if [[ ! -d "$HYPR_SRC_DIR" ]]; then
       warn "Hypr source directory not found: $HYPR_SRC_DIR (will skip sync)"
-      SYNC_HYPR_CONFIGS=false
+      # Don't disable automatically, just warn
     fi
     if [[ ! -d "$HYPRL_SRC_DIR" ]]; then
       warn "Hyprl source directory not found: $HYPRL_SRC_DIR (will skip sync)"
-      SYNC_HYPR_CONFIGS=false
+      # Don't disable automatically, just warn
     fi
   fi
   

@@ -87,6 +87,50 @@ success() {
   write_log "[SUCCESS] $*"
 }
 
+# ======================================
+# SUDO OPTIMIZATION
+# ======================================
+
+# Array to store sudo commands for batch execution
+SUDO_COMMANDS=()
+
+# Add a command to the sudo batch
+add_sudo_command() {
+  SUDO_COMMANDS+=("$1")
+}
+
+# Execute all accumulated sudo commands at once
+execute_sudo_batch() {
+  if [[ ${#SUDO_COMMANDS[@]} -eq 0 ]]; then
+    return 0
+  fi
+  
+  info "Executing ${#SUDO_COMMANDS[@]} sudo commands..."
+  
+  # Join all commands with && to ensure they all succeed
+  local combined_command
+  combined_command=$(printf " && %s" "${SUDO_COMMANDS[@]}" | sed 's/^ && //')
+  
+  if eval "sudo bash -c '$combined_command'"; then
+    success "All sudo commands executed successfully"
+    # Clear the array
+    SUDO_COMMANDS=()
+    return 0
+  else
+    err "Some sudo commands failed"
+    # Clear the array
+    SUDO_COMMANDS=()
+    return 1
+  fi
+}
+
+# Force execute sudo batch (useful for critical operations)
+force_sudo_batch() {
+  if [[ ${#SUDO_COMMANDS[@]} -gt 0 ]]; then
+    execute_sudo_batch
+  fi
+}
+
 # Utility functions
 is_debug_mode() {
   [[ "${DEBUG_MODE:-false}" == "true" ]]

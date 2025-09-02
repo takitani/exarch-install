@@ -26,15 +26,12 @@ pac() {
   fi
   
   write_log "Attempting to install $pkg via pacman..."
-  if sudo pacman -S --noconfirm --needed "$@" 2>>"$LOG_FILE" 1>&2; then
-    INSTALLED_PACKAGES+=("$pkg (pacman)")
-    write_summary "✅ Installed: $pkg (pacman)"
-    return 0
-  else
-    FAILED_PACKAGES+=("$pkg (pacman)")
-    write_summary "❌ Failed: $pkg (pacman)"
-    return 1
-  fi
+  
+  # Add to sudo batch for later execution
+  add_sudo_command "pacman -S --noconfirm --needed $*"
+  INSTALLED_PACKAGES+=("$pkg (pacman)")
+  write_summary "✅ Queued: $pkg (pacman)"
+  return 0
 }
 
 # Package installation function for AUR
@@ -315,14 +312,10 @@ update_databases() {
     return 0
   fi
   
-  # Update pacman database
-  if sudo pacman -Sy; then
-    success "Pacman database updated"
-  else
-    warn "Failed to update pacman database"
-  fi
+  # Add pacman update to sudo batch
+  add_sudo_command "pacman -Sy"
   
-  # Update yay/AUR database if yay is available
+  # Update yay/AUR database if yay is available (no sudo needed)
   if command_exists yay; then
     if yay -Sy; then
       success "AUR database updated"

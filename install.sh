@@ -96,7 +96,8 @@ show_menu() {
     "SETUP_DOTFILES_MANAGEMENT:Dotfiles management" \
     "SETUP_DEV_PGPASS:Dev .pgpass via 1Password" \
     "SETUP_SSH_KEYS:SSH keys sync via 1Password" \
-    "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password"
+    "GENERATE_REMMINA_CONNECTIONS:Generate Remmina RDP connections from 1Password" \
+    "FIX_CURSOR_INPUT_METHOD:Fix Cursor input method (BR keyboard support)"
     
   # Only show Dell XPS category if detected or forced
   local hw_info
@@ -157,7 +158,7 @@ show_system_info_compact() {
 show_menu_controls() {
   echo -e "${BOLD}Controls:${NC}"
   echo -e "  ${CYAN}0-30${NC} Toggle item   ${CYAN}Enter${NC} Install"
-  echo -e "  ${CYAN}a${NC} All   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
+  echo -e "  ${CYAN}a${NC} All   ${CYAN}n${NC} None   ${CYAN}r${NC} Recommended   ${CYAN}d${NC} Development   ${CYAN}m${NC} Minimal   ${CYAN}x${NC} Dell XPS"
   echo -e "  ${CYAN}h${NC} Hardware report   ${CYAN}q${NC} Quit"
   
   if is_debug_mode; then
@@ -197,11 +198,26 @@ interactive_menu() {
     
     case "$choice" in
       ""|"enter")
-        start_installation
-        break
+        if start_installation; then
+          break
+        else
+          local install_result=$?
+          if [[ $install_result -eq 2 ]]; then
+            # Return to menu - clear collected configuration
+            unset GIT_USERNAME GIT_EMAIL SSH_KEY_NAME HYPR_DOTFILES_PATH ONEPASSWORD_ACCOUNT ONEPASSWORD_EMAIL
+            # Continue to next iteration of the while loop
+            continue
+          else
+            # Installation failed or cancelled
+            break
+          fi
+        fi
         ;;
       "a")
         apply_profile "all"
+        ;;
+      "n")
+        apply_profile "none"
         ;;
       "r")
         apply_profile "recommended" 
@@ -275,6 +291,43 @@ apply_profile() {
       SETUP_DELL_XPS_9320=true
       SETUP_DUAL_KEYBOARD=true
       GENERATE_REMMINA_CONNECTIONS=true
+      FIX_CURSOR_INPUT_METHOD=true
+      ;;
+    "none")
+      # Disable all options
+      INSTALL_GOOGLE_CHROME=false
+      INSTALL_FIREFOX=false
+      INSTALL_COPYQ=false
+      INSTALL_DROPBOX=false
+      INSTALL_AWS_VPN=false
+      INSTALL_POSTMAN=false
+      INSTALL_REMMINA=false
+      INSTALL_ESPANSO=false
+      INSTALL_NANO=false
+      INSTALL_MICRO=false
+      INSTALL_KATE=false
+      INSTALL_SLACK=false
+      INSTALL_TEAMS=false
+      INSTALL_JB_TOOLBOX=false
+      INSTALL_JB_RIDER=false
+      INSTALL_JB_DATAGRIP=false
+      INSTALL_CURSOR=false
+      INSTALL_VSCODE=false
+      INSTALL_WINDSURF=false
+      INSTALL_MISE_RUNTIMES=false
+      INSTALL_CLAUDE_CODE=false
+      INSTALL_CODEX_CLI=false
+      INSTALL_GEMINI_CLI=false
+      SYNC_HYPR_CONFIGS=false
+      INSTALL_CHEZMOI=false
+      INSTALL_AGE=false
+      SETUP_DOTFILES_MANAGEMENT=false
+      SETUP_DEV_PGPASS=false
+      SETUP_DELL_XPS_9320=false
+      SETUP_DUAL_KEYBOARD=false
+      GENERATE_REMMINA_CONNECTIONS=false
+      FIX_CURSOR_INPUT_METHOD=false
+      echo -e "${RED}✗ All options disabled - select items individually${NC}"
       ;;
     "recommended")
       # Reset all first
@@ -309,6 +362,7 @@ apply_profile() {
       SETUP_DELL_XPS_9320=false
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=false
+      FIX_CURSOR_INPUT_METHOD=false
       ;;
     "development")
       INSTALL_GOOGLE_CHROME=true
@@ -342,6 +396,7 @@ apply_profile() {
       SETUP_DELL_XPS_9320=false
       SETUP_DUAL_KEYBOARD=false
       GENERATE_REMMINA_CONNECTIONS=true
+      FIX_CURSOR_INPUT_METHOD=true
       ;;
     "minimal")
       # Deselect all options
@@ -478,6 +533,20 @@ start_installation() {
   echo
   info "Starting installation with current configuration..."
   
+  # Collect and confirm all user data before installation
+  collect_and_confirm_user_data
+  local confirmation_result=$?
+  info "Confirmation result: $confirmation_result"
+  
+  if [[ $confirmation_result -eq 2 ]]; then
+    # User wants to return to menu
+    info "User wants to return to menu"
+    return 2
+  elif [[ $confirmation_result -ne 0 ]]; then
+    info "Installation cancelled by user"
+    return 1
+  fi
+  
   # Initialize logging
   init_logging
   
@@ -490,11 +559,239 @@ start_installation() {
   # Execute modules
   execute_installation_modules
   
+  # Execute any pending sudo commands
+  force_sudo_batch
+  
   # Post-installation tasks
   perform_post_installation_tasks
   
   # Show final report
   show_final_report
+}
+
+# Collect and confirm all user data before installation
+collect_and_confirm_user_data() {
+  echo
+  echo -e "${CYAN}╔═══════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}║  ${BOLD}Configuration Confirmation${NC}${CYAN} ║${NC}"
+  echo -e "${CYAN}╚═══════════════════════════════════════╝${NC}"
+  echo
+  echo "Please review and confirm the following configuration:"
+  echo
+  
+  # Collect Git configuration
+  collect_git_config
+  
+  # Collect SSH key information if SSH sync is enabled
+  if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
+    collect_ssh_config
+  fi
+  
+  # Collect Hyprland dotfiles path if sync is enabled
+  if [[ "${SYNC_HYPR_CONFIGS:-false}" == "true" ]]; then
+    collect_hypr_config
+  fi
+  
+  # Collect 1Password configuration if needed
+  if module_enabled "1password"; then
+    collect_1password_config
+  fi
+  
+  # Show all collected data for confirmation
+  show_configuration_summary
+  
+  # Ask for confirmation
+  echo
+  echo -e "${YELLOW}Do you want to proceed with this configuration?${NC}"
+  echo -n "Type 'yes', 'y', or press ENTER to continue, 'no' to modify: "
+  read -r confirmation
+  
+  # Normalize confirmation input
+  local normalized_confirmation
+  normalized_confirmation=$(echo "$confirmation" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+  
+  if [[ "$normalized_confirmation" == "yes" ]] || [[ "$normalized_confirmation" == "y" ]] || [[ -z "$normalized_confirmation" ]]; then
+    success "Configuration confirmed. Starting installation..."
+    return 0
+  else
+    info "Returning to menu to modify settings..."
+    return 2  # Special return code to indicate return to menu
+  fi
+}
+
+# Collect Git configuration
+collect_git_config() {
+  echo -e "${BOLD}Git Configuration:${NC}"
+  
+  # Try to read existing Git config
+  local existing_username
+  local existing_email
+  
+  if command_exists git; then
+    existing_username=$(git config --global user.name 2>/dev/null || echo "")
+    existing_email=$(git config --global user.email 2>/dev/null || echo "")
+  fi
+  
+  # Git username
+  if [[ -z "${GIT_USERNAME:-}" ]]; then
+    if [[ -n "$existing_username" ]]; then
+      echo -e "Git username: ${CYAN}${existing_username}${NC} (from existing .gitconfig)"
+      echo -n "Press Enter to keep or type new username: "
+      read -r new_username
+      if [[ -n "$new_username" ]]; then
+        GIT_USERNAME="$new_username"
+        # Persist to disk
+        git config --global user.name "$new_username"
+        info "Git username updated to: $new_username"
+      else
+        GIT_USERNAME="$existing_username"
+      fi
+    else
+      echo -n "Git username: "
+      read -r GIT_USERNAME
+      # Persist to disk
+      git config --global user.name "$GIT_USERNAME"
+      info "Git username set to: $GIT_USERNAME"
+    fi
+  else
+    echo -e "Git username: ${CYAN}${GIT_USERNAME}${NC} (from environment)"
+    echo -n "Press Enter to keep or type new username: "
+    read -r new_username
+    if [[ -n "$new_username" ]]; then
+      GIT_USERNAME="$new_username"
+      # Persist to disk
+      git config --global user.name "$new_username"
+      info "Git username updated to: $new_username"
+    fi
+  fi
+  
+  # Git email
+  if [[ -z "${GIT_EMAIL:-}" ]]; then
+    if [[ -n "$existing_email" ]]; then
+      echo -e "Git email: ${CYAN}${existing_email}${NC} (from existing .gitconfig)"
+      echo -n "Press Enter to keep or type new email: "
+      read -r new_email
+      if [[ -n "$new_email" ]]; then
+        GIT_EMAIL="$new_email"
+        # Persist to disk
+        git config --global user.email "$new_email"
+        info "Git email updated to: $new_email"
+      else
+        GIT_EMAIL="$existing_email"
+      fi
+    else
+      echo -n "Git email: "
+      read -r GIT_EMAIL
+      # Persist to disk
+      git config --global user.email "$GIT_EMAIL"
+      info "Git email set to: $GIT_EMAIL"
+    fi
+  else
+    echo -e "Git email: ${CYAN}${GIT_EMAIL}${NC} (from environment)"
+    echo -n "Press Enter to keep or type new email: "
+    read -r new_email
+    if [[ -n "$new_email" ]]; then
+      GIT_EMAIL="$new_email"
+      # Persist to disk
+      git config --global user.email "$new_email"
+      info "Git email updated to: $new_email"
+    fi
+  fi
+  
+  echo
+}
+
+# Collect SSH configuration
+collect_ssh_config() {
+  echo -e "${BOLD}SSH Configuration:${NC}"
+  
+  # SSH key name in 1Password
+  if [[ -z "${SSH_KEY_NAME:-}" ]]; then
+    echo -n "SSH key name in 1Password: "
+    read -r SSH_KEY_NAME
+  else
+    echo -e "SSH key name in 1Password: ${CYAN}${SSH_KEY_NAME}${NC} (from environment)"
+  fi
+  
+  echo
+}
+
+# Collect Hyprland configuration
+collect_hypr_config() {
+  echo -e "${BOLD}Hyprland Configuration:${NC}"
+  
+  # Hyprland dotfiles path
+  if [[ -z "${HYPR_DOTFILES_PATH:-}" ]]; then
+    echo -n "Hyprland dotfiles path (default: ~/.config/hypr): "
+    read -r HYPR_DOTFILES_PATH
+    HYPR_DOTFILES_PATH="${HYPR_DOTFILES_PATH:-~/.config/hypr}"
+  else
+    echo -e "Hyprland dotfiles path: ${CYAN}${HYPR_DOTFILES_PATH}${NC} (from environment)"
+  fi
+  
+  echo
+}
+
+# Collect 1Password configuration
+collect_1password_config() {
+  echo -e "${BOLD}1Password Configuration:${NC}"
+  
+  # Check if 1Password CLI is already authenticated (hybrid mode)
+  if op account list >/dev/null 2>&1; then
+    echo -e "1Password: ${CYAN}Already authenticated via desktop app${NC}"
+    echo -e "Using hybrid integration mode (no additional config needed)"
+    echo
+    return 0
+  fi
+  
+  # Only ask for credentials if not authenticated
+  # 1Password account
+  if [[ -z "${ONEPASSWORD_ACCOUNT:-}" ]]; then
+    echo -n "1Password account (e.g., myteam.1password.com): "
+    read -r ONEPASSWORD_ACCOUNT
+  else
+    echo -e "1Password account: ${CYAN}${ONEPASSWORD_ACCOUNT}${NC} (from environment)"
+  fi
+  
+  # 1Password email
+  if [[ -z "${ONEPASSWORD_EMAIL:-}" ]]; then
+    echo -n "1Password email: "
+    read -r ONEPASSWORD_EMAIL
+  else
+    echo -e "1Password email: ${CYAN}${ONEPASSWORD_EMAIL}${NC} (from environment)"
+  fi
+  
+  echo
+}
+
+# Show configuration summary
+show_configuration_summary() {
+  echo -e "${BOLD}Configuration Summary:${NC}"
+  echo "================================"
+  
+  # Git config
+  if [[ -n "${GIT_USERNAME:-}" ]] || [[ -n "${GIT_EMAIL:-}" ]]; then
+    echo -e "Git username: ${CYAN}${GIT_USERNAME:-Not set}${NC}"
+    echo -e "Git email: ${CYAN}${GIT_EMAIL:-Not set}${NC}"
+  fi
+  
+  # SSH config
+  if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
+    echo -e "SSH key name: ${CYAN}${SSH_KEY_NAME:-Not set}${NC}"
+  fi
+  
+  # Hyprland config
+  if [[ "${SYNC_HYPR_CONFIGS:-false}" == "true" ]]; then
+    echo -e "Hyprland dotfiles: ${CYAN}${HYPR_DOTFILES_PATH:-Not set}${NC}"
+  fi
+  
+  # 1Password config
+  if module_enabled "1password"; then
+    echo -e "1Password account: ${CYAN}${ONEPASSWORD_ACCOUNT:-Not set}${NC}"
+    echo -e "1Password email: ${CYAN}${ONEPASSWORD_EMAIL:-Not set}${NC}"
+  fi
+  
+  echo
 }
 
 # Pre-installation system checks
@@ -534,14 +831,19 @@ setup_installation_environment() {
   # Setup temporary DNS if configured
   if [[ "${#DNS_SERVERS[@]}" -gt 0 ]] && [[ ! -f "/tmp/resolv.conf.backup" ]]; then
     info "Configuring temporary DNS..."
-    sudo cp /etc/resolv.conf /tmp/resolv.conf.backup
+    add_sudo_command "cp /etc/resolv.conf /tmp/resolv.conf.backup"
     
+    # Create DNS configuration
+    local dns_config="/tmp/dns_config_$$"
     {
       echo "# Temporary DNS for installation"
       for dns in "${DNS_SERVERS[@]}"; do
         echo "nameserver $dns"
       done
-    } | sudo tee /etc/resolv.conf > /dev/null
+    } > "$dns_config"
+    
+    add_sudo_command "cp $dns_config /etc/resolv.conf"
+    add_sudo_command "rm -f $dns_config"
   fi
   
   # Update package databases if configured
