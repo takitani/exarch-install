@@ -1425,6 +1425,11 @@ execute_installation_modules() {
   # Wait for all background jobs to complete
   wait_for_background_jobs
   
+  # Post-installation configurations that depend on installed packages
+  if command -v post_install_cursor_config >/dev/null 2>&1; then
+    post_install_cursor_config
+  fi
+  
   success "All modules executed"
 }
 

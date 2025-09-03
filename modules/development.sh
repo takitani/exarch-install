@@ -189,12 +189,25 @@ install_development_editors() {
     start_background_job "$editor" "$editor" "aur"
   done
   
-  # Configure Cursor cedilla fix if Cursor is being installed
-  if [[ "${INSTALL_CURSOR:-true}" == "true" ]]; then
-    configure_cursor_cedilla_fix
-  fi
+  # Note: Cursor cedilla fix will be applied after installation in post_install_cursor_config()
   
   success "Development editors installation initiated"
+}
+
+# Post-installation configuration for Cursor
+post_install_cursor_config() {
+  # Configure Cursor cedilla fix if Cursor is being installed and FIX_CURSOR_INPUT_METHOD is enabled
+  if [[ "${INSTALL_CURSOR:-true}" == "true" ]] && [[ "${FIX_CURSOR_INPUT_METHOD:-false}" == "true" ]]; then
+    info "Applying Cursor input method configuration..."
+    
+    # Check if Cursor is actually installed before configuring
+    if command_exists cursor || [[ -f "/usr/bin/cursor" ]] || [[ -f "/usr/share/cursor/cursor" ]]; then
+      configure_cursor_cedilla_fix
+    else
+      warn "Cursor not found, skipping cedilla configuration"
+      info "You can run the configuration later with: ./helpers/fix-cursor-simple.sh"
+    fi
+  fi
 }
 
 # Install JetBrains IDEs
@@ -583,7 +596,7 @@ show_development_summary() {
 }
 
 # Export functions
-export -f configure_cursor_cedilla_fix install_development_editors install_jetbrains_ides install_claude_code
+export -f configure_cursor_cedilla_fix install_development_editors post_install_cursor_config install_jetbrains_ides install_claude_code
 export -f install_ai_cli_tools configure_mise_runtimes configure_nodejs_runtime
 export -f configure_dotnet_runtime install_global_npm_packages install_development_tools
 export -f install_container_tools setup_development_environment configure_git
