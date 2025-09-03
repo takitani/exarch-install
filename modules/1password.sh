@@ -673,29 +673,35 @@ setup_1password_complete() {
       echo "2) Reconfigure 1Password"
       echo "3) Skip"
       echo
-      echo -n "Choose (1/2/3): "
-      read -r signin_choice
       
-      case "$signin_choice" in
-        1)
-          if ! signin_1password_cli; then
-            err "Failed to authenticate with 1Password"
-            return 1
-          fi
-          return 0
-          ;;
-        2)
-          status="not_configured"  # Force showing menu
-          ;;
-        3)
-          info "Skipping 1Password configuration"
-          return 0
-          ;;
-        *)
-          err "Invalid choice"
-          return 1
-          ;;
-      esac
+      while true; do
+        echo -n "Choose (1/2/3): "
+        read -r signin_choice
+        
+        case "$signin_choice" in
+          1)
+            if ! signin_1password_cli; then
+              err "Failed to authenticate with 1Password"
+              return 1
+            fi
+            return 0
+            ;;
+          2)
+            status="not_configured"  # Force showing menu
+            break  # Exit inner loop to reconfigure
+            ;;
+          3)
+            info "Skipping 1Password configuration"
+            return 0
+            ;;
+          "")
+            warn "Please select an option (1, 2, or 3)"
+            ;;
+          *)
+            warn "Invalid choice. Please enter 1, 2, or 3."
+            ;;
+        esac
+      done
       ;;
   esac
   
@@ -1352,8 +1358,40 @@ generate_pgpass_file() {
   done < <(echo "$db_items" | jq -c '.[]')
   
   echo
-  echo "Enter numbers of credentials (space-separated) or 'a' for all:"
-  read -r selection
+  
+  # Loop until valid selection is made
+  while true; do
+    echo "Enter numbers of credentials (space-separated) or 'a' for all:"
+    read -r selection
+    
+    # Check if selection is empty
+    if [[ -z "$selection" ]]; then
+      warn "No selection made. Please enter numbers or 'a' for all."
+      echo
+      continue
+    fi
+    
+    # Validate the selection
+    if [[ "$selection" == "a" || "$selection" == "A" ]]; then
+      break  # Valid selection for all
+    fi
+    
+    # Check if at least one valid number was provided
+    local has_valid_number=false
+    for num in $selection; do
+      if [[ "$num" =~ ^[0-9]+$ ]] && [[ "$num" -ge 1 ]] && [[ "$num" -le "${#selected_items[@]}" ]]; then
+        has_valid_number=true
+        break
+      fi
+    done
+    
+    if [[ "$has_valid_number" == "true" ]]; then
+      break  # Valid number selection
+    else
+      warn "Invalid selection. Please enter valid numbers (1-${#selected_items[@]}) or 'a' for all."
+      echo
+    fi
+  done
   
   local pgpass_entries=()
   
