@@ -168,7 +168,7 @@ show_menu() {
   
   # Show XPS menu if: hardware contains XPS, or FORCE_XPS is set, or is_xps_mode returns true
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]] || is_xps_mode; then
-    show_menu_category "Dell XPS 13 Plus" "100" \
+    show_menu_category "Dell XPS 13 Plus" "110" \
       "SETUP_DELL_XPS_WEBCAM:Webcam drivers (IPU6 + IVSC firmware)" \
       "SETUP_DELL_XPS_POWER:Power management (TLP + battery optimization)" \
       "SETUP_DELL_XPS_KEYBOARD:Dual keyboard layout (BR + US International)" \
@@ -844,7 +844,7 @@ toggle_option() {
     70) toggle_ai_cli_group ;;
     80) toggle_virtual_env_group ;;
     90) toggle_system_config_group ;;
-    100) toggle_dell_xps_group ;;
+    110) toggle_dell_xps_group ;;
     
     # Individual toggles
     0) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
@@ -861,12 +861,12 @@ toggle_option() {
     11) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
     12) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
     13) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
-    14) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
-    16) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
-    17) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
-    18) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    19) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
-    20) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
+    54) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
+    55) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
+    56) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
+    52) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    53) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    51) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
     21) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
     22) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
     23) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
@@ -897,12 +897,12 @@ toggle_option() {
     81) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
     82) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
     
-    101) SETUP_DELL_XPS_WEBCAM=$([ "$SETUP_DELL_XPS_WEBCAM" == true ] && echo false || echo true) ;;
-    102) SETUP_DELL_XPS_POWER=$([ "$SETUP_DELL_XPS_POWER" == true ] && echo false || echo true) ;;
-    103) SETUP_DELL_XPS_KEYBOARD=$([ "$SETUP_DELL_XPS_KEYBOARD" == true ] && echo false || echo true) ;;
-    104) SETUP_DELL_XPS_UTILITIES=$([ "$SETUP_DELL_XPS_UTILITIES" == true ] && echo false || echo true) ;;
-    105) SETUP_DELL_XPS_SHUTDOWN=$([ "$SETUP_DELL_XPS_SHUTDOWN" == true ] && echo false || echo true) ;;
-    106) SETUP_DELL_XPS_KERNEL=$([ "$SETUP_DELL_XPS_KERNEL" == true ] && echo false || echo true) ;;
+    111) SETUP_DELL_XPS_WEBCAM=$([ "$SETUP_DELL_XPS_WEBCAM" == true ] && echo false || echo true) ;;
+    112) SETUP_DELL_XPS_POWER=$([ "$SETUP_DELL_XPS_POWER" == true ] && echo false || echo true) ;;
+    113) SETUP_DELL_XPS_KEYBOARD=$([ "$SETUP_DELL_XPS_KEYBOARD" == true ] && echo false || echo true) ;;
+    114) SETUP_DELL_XPS_UTILITIES=$([ "$SETUP_DELL_XPS_UTILITIES" == true ] && echo false || echo true) ;;
+    115) SETUP_DELL_XPS_SHUTDOWN=$([ "$SETUP_DELL_XPS_SHUTDOWN" == true ] && echo false || echo true) ;;
+    116) SETUP_DELL_XPS_KERNEL=$([ "$SETUP_DELL_XPS_KERNEL" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
