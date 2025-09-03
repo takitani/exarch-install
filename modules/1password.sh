@@ -17,13 +17,40 @@ export ONEPASSWORD_CLI_ONLY="${ONEPASSWORD_CLI_ONLY:-false}"  # CLI-only mode fl
 setup_temp_dns_for_op() {
   local dns_modified=false
   
+  # Check if sudo is available and working
+  if ! command_exists sudo; then
+    warn "sudo not available, skipping DNS modification"
+    echo "false"
+    return 0
+  fi
+  
+  # Test sudo access without modifying anything
+  if ! timeout 10 sudo -n true 2>/dev/null; then
+    warn "sudo requires password or not available, skipping DNS modification"
+    echo "false"
+    return 0
+  fi
+  
   # Only modify DNS if we're having connectivity issues
   if [[ -f /etc/resolv.conf ]] && [[ ! -f /tmp/resolv.conf.op.backup ]]; then
     info "Setting up temporary DNS for 1Password connection..."
-    sudo cp /etc/resolv.conf /tmp/resolv.conf.op.backup
-    echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" | sudo tee /etc/resolv.conf > /dev/null
-    dns_modified=true
-    sleep 2  # Give DNS time to propagate
+    
+    # Use timeout to prevent hanging
+    if timeout 10 sudo cp /etc/resolv.conf /tmp/resolv.conf.op.backup; then
+      if timeout 10 sudo tee /etc/resolv.conf > /dev/null <<< "nameserver 8.8.8.8
+nameserver 1.1.1.1"; then
+        dns_modified=true
+        info "Temporary DNS configured (8.8.8.8, 1.1.1.1)"
+        sleep 2  # Give DNS time to propagate
+      else
+        warn "Failed to set temporary DNS, restoring original"
+        sudo mv /tmp/resolv.conf.op.backup /etc/resolv.conf
+        dns_modified=false
+      fi
+    else
+      warn "Failed to backup DNS config, skipping modification"
+      dns_modified=false
+    fi
   fi
   
   echo "$dns_modified"
@@ -33,7 +60,14 @@ setup_temp_dns_for_op() {
 restore_dns_after_op() {
   if [[ -f /tmp/resolv.conf.op.backup ]]; then
     info "Restoring original DNS configuration..."
-    sudo mv /tmp/resolv.conf.op.backup /etc/resolv.conf
+    
+    # Use timeout to prevent hanging
+    if timeout 10 sudo mv /tmp/resolv.conf.op.backup /etc/resolv.conf; then
+      info "Original DNS configuration restored"
+    else
+      warn "Failed to restore DNS configuration, manual intervention may be needed"
+      echo "Backup file remains at: /tmp/resolv.conf.op.backup"
+    fi
   fi
 }
 
@@ -845,229 +879,217 @@ setup_1password_complete() {
             ;;
           4)
             info "Basic manual configuration..."
+            info "Setting overall timeout of 2 minutes for this operation..."
             
-            # Use URL from .env if available
-            local address="${ONEPASSWORD_URL:-}"
-            if [[ -n "$address" ]]; then
-              # Clean URL format
-              address="${address#https://}"
-              address="${address#http://}"
-              address="${address%/}"
-              
-              info "Using configured URL: $address"
-              
-              # Use email from .env if available
-              local email="${ONEPASSWORD_EMAIL:-}"
-              if [[ -n "$email" ]]; then
-                info "Using configured email: $email"
-              else
-                echo -n "Enter email for $address: "
-                read -r email
-              fi
-              
-              if [[ -n "$email" ]]; then
-                echo "Debug: About to run: op account add --address '$address' --email '$email'"
-                echo "Debug: Testing connectivity to $address..."
+            # Execute the entire operation with timeout to prevent hanging
+            if timeout 120 bash -c '
+              # Use URL from .env if available
+              local address="${ONEPASSWORD_URL:-}"
+              if [[ -n "$address" ]]; then
+                # Clean URL format
+                address="${address#https://}"
+                address="${address#http://}"
+                address="${address%/}"
                 
-                # Test HTTPS connectivity 
-                if curl -I -s --connect-timeout 10 "https://$address" >/dev/null 2>&1; then
-                  info "✅ Connectivity to $address OK"
+                echo "Using configured URL: $address"
+                
+                # Use email from .env if available
+                local email="${ONEPASSWORD_EMAIL:-}"
+                if [[ -n "$email" ]]; then
+                  echo "Using configured email: $email"
                 else
-                  warn "⚠️ Connectivity test to $address failed - but will try anyway"
+                  echo -n "Enter email for $address: "
+                  read -r email
                 fi
                 
-                # Additional debugging - test what op can see
-                echo "Debug: Testing op CLI connectivity..."
-                echo "Debug: op version: $(op --version 2>/dev/null || echo 'version check failed')"
-                echo "Debug: DNS resolution test:"
-                nslookup "$address" 2>/dev/null | grep -A2 "Name:" | head -3 || echo "nslookup failed"
-                
-                # Test with verbose op command
-                echo "Debug: Running op with detailed error output..."
-                
-                # Try with environment variables that might help
-                echo "Debug: Trying with SSL/network environment variables..."
-                
-                # First attempt without DNS modification
-                local op_success=false
-                local dns_modified=false
-                
-                # Clear SSL environment that might interfere
-                export CURL_CA_BUNDLE=""
-                export SSL_CERT_DIR=""
-                export SSL_CERT_FILE=""
-                
-                # Try adding account first, then sign in separately
-                echo "Adding 1Password account..."
-                echo "You will need your Secret Key and Master Password"
-                echo "Secret Key format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
-                echo
-                
-                # First try to add the account (this should be quick)
-                if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
-                  info "Account added successfully, now signing in..."
+                if [[ -n "$email" ]]; then
+                  echo "Debug: About to run: op account add --address $address --email $email"
+                  echo "Debug: Testing connectivity to $address..."
                   
-                  # Now try to sign in to the account
-                  if eval "$(op signin --account "$address" 2>/tmp/op_signin.log)"; then
-                    op_success=true
-                    success "Successfully signed in to 1Password!"
+                  # Test HTTPS connectivity 
+                  if curl -I -s --connect-timeout 10 "https://$address" >/dev/null 2>&1; then
+                    echo "✅ Connectivity to $address OK"
                   else
-                    warn "Account added but failed to sign in"
-                    cat /tmp/op_signin.log >&2
+                    echo "⚠️ Connectivity test to $address failed - but will try anyway"
                   fi
-                else
-                  local exit_code=$?
-                  # Check if it's a timeout or other error
-                  if [[ $exit_code -eq 124 ]]; then
-                    warn "Command timed out after 30 seconds"
-                  else
-                    # Show the actual error
-                    cat /tmp/op_error.log >&2
+                  
+                  # Additional debugging - test what op can see
+                  echo "Debug: Testing op CLI connectivity..."
+                  echo "Debug: op version: $(op --version 2>/dev/null || echo "version check failed")"
+                  echo "Debug: DNS resolution test:"
+                  nslookup "$address" 2>/dev/null | grep -A2 "Name:" | head -3 || echo "nslookup failed"
+                  
+                  # Test with verbose op command
+                  echo "Debug: Running op with detailed error output..."
+                  
+                  # Try with environment variables that might help
+                  echo "Debug: Trying with SSL/network environment variables..."
+                  
+                  # First attempt without DNS modification
+                  local op_success=false
+                  local dns_modified=false
+                  
+                  # Clear SSL environment that might interfere
+                  export CURL_CA_BUNDLE=""
+                  export SSL_CERT_DIR=""
+                  export SSL_CERT_FILE=""
+                  
+                  # Try adding account first, then sign in separately
+                  echo "Adding 1Password account..."
+                  echo "You will need your Secret Key and Master Password"
+                  echo "Secret Key format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                  echo
+                  
+                  # First try to add the account (this should be quick)
+                  if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                    echo "Account added successfully, now signing in..."
                     
-                    # Check for specific issues
-                    if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
-                      warn "Network/SSL issue detected, trying with temporary DNS configuration..."
+                    # Now try to sign in to the account
+                    if eval "$(op signin --account "$address" 2>/tmp/op_signin.log)"; then
+                      op_success=true
+                      echo "Successfully signed in to 1Password!"
+                    else
+                      echo "Account added but failed to sign in"
+                      cat /tmp/op_signin.log >&2
+                    fi
+                  else
+                    local exit_code=$?
+                    # Check if it is a timeout or other error
+                    if [[ $exit_code -eq 124 ]]; then
+                      echo "Command timed out after 30 seconds"
+                    else
+                      # Show the actual error
+                      cat /tmp/op_error.log >&2
                       
-                      # Setup temporary DNS
-                      dns_modified=$(setup_temp_dns_for_op)
-                      
-                      # Retry with temporary DNS
-                      echo "Retrying with alternative DNS configuration..."
-                      if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
-                        info "Account added with alternative DNS, now signing in..."
-                        if eval "$(op signin --account "$address")"; then
-                          op_success=true
-                          success "Successfully signed in to 1Password!"
+                      # Check for specific issues
+                      if grep -qi "couldn'\''t connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                        echo "Network/SSL issue detected, trying with temporary DNS configuration..."
+                        
+                        # Setup temporary DNS with timeout
+                        echo "Setting up temporary DNS (this may take a few seconds)..."
+                        dns_modified=$(timeout 15 setup_temp_dns_for_op)
+                        
+                        # Retry with temporary DNS
+                        echo "Retrying with alternative DNS configuration..."
+                        if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                          echo "Account added with alternative DNS, now signing in..."
+                          if eval "$(op signin --account "$address")"; then
+                            op_success=true
+                            echo "Successfully signed in to 1Password!"
+                          fi
                         fi
                       fi
                     fi
                   fi
-                fi
+                      
+                  # Restore DNS if we modified it
+                  if [[ "$dns_modified" == "true" ]]; then
+                    restore_dns_after_op
+                  fi
+                  
+                  if [[ "$op_success" == "true" ]]; then
+                    if signin_1password_cli; then
+                      echo "Basic manual configuration completed successfully!"
+                      exit 0
+                    else
+                      echo "Failed to sign in after manual configuration"
+                      exit 1
+                    fi
+                  else
+                    echo "Failed to add account with configured settings"
+                    echo "Command executed: op account add --address $address --email $email"
+                    echo
+                    echo "Possible issues:"
+                    echo "  • Check if URL is correct: $address"
+                    echo "  • Check network connectivity from this machine"
+                    echo "  • Try manually: curl -I https://$address"
+                    echo
+                    echo "Advanced debugging:"
+                    echo "  • Test telnet: telnet $address 443"
+                    echo "  • Test openssl: openssl s_client -connect $address:443 -servername $address < /dev/null"
+                    echo "  • Check if corporate firewall blocks 1Password CLI specifically"
+                    echo
                     
-                # Restore DNS if we modified it
-                if [[ "$dns_modified" == "true" ]]; then
-                  restore_dns_after_op
+                    # Test if it is a certificate issue
+                    echo "Testing SSL certificate..."
+                    if openssl s_client -connect "$address:443" -servername "$address" < /dev/null 2>/dev/null | grep -q "Verify return code: 0"; then
+                      echo "✅ SSL certificate is valid"
+                    else
+                      echo "⚠️ SSL certificate issue detected"
+                    fi
+                    
+                    echo "Since basic manual configuration failed, let us try the interactive helper instead."
+                    exit 1
+                  fi
+                else
+                  echo "Email is required"
+                  exit 1
+                fi
+              else
+                echo "No default URL configured, using standard op account add..."
+                
+                # Try with DNS workaround if needed
+                local op_success=false
+                local dns_modified=false
+                
+                if timeout 30 op account add </dev/null 2>/tmp/op_error.log; then
+                  op_success=true
+                else
+                  # Check for network/SSL errors and retry with DNS fix
+                  if grep -qi "couldn'\''t connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                    echo "Network/SSL issue detected, trying with temporary DNS..."
+                    dns_modified=$(setup_temp_dns_for_op)
+                    
+                    if timeout 30 op account add </dev/null; then
+                      op_success=true
+                    fi
+                    
+                    if [[ "$dns_modified" == "true" ]]; then
+                      restore_dns_after_op
+                    fi
+                  fi
                 fi
                 
                 if [[ "$op_success" == "true" ]]; then
                   if signin_1password_cli; then
-                    success "Basic manual configuration completed successfully!"
-                    break
+                    echo "Basic configuration completed successfully!"
+                    exit 0
                   else
-                    err "Failed to sign in after manual configuration"
-                    if ! ask_yes_no "Try a different configuration method?"; then
-                      return 1
-                    fi
+                    echo "Failed to sign in after basic configuration"
+                    exit 1
                   fi
                 else
-                  err "Failed to add account with configured settings"
-                  echo "Command executed: op account add --address '$address' --email '$email'"
-                  echo
-                  echo "Possible issues:"
-                  echo "  • Check if URL is correct: $address"
-                  echo "  • Check network connectivity from this machine"
-                  echo "  • Try manually: curl -I https://$address"
-                  echo
-                  echo "Advanced debugging:"
-                  echo "  • Test telnet: telnet $address 443"
-                  echo "  • Test openssl: openssl s_client -connect $address:443 -servername $address < /dev/null"
-                  echo "  • Check if corporate firewall blocks 1Password CLI specifically"
-                  echo
-                  
-                  # Test if it's a certificate issue
-                  echo "Testing SSL certificate..."
-                  if openssl s_client -connect "$address:443" -servername "$address" < /dev/null 2>/dev/null | grep -q "Verify return code: 0"; then
-                    info "✅ SSL certificate is valid"
-                  else
-                    warn "⚠️ SSL certificate issue detected"
-                  fi
-                  
-                  echo "Since basic manual configuration failed, let's try the interactive helper instead."
-                  if ask_yes_no "Run the interactive 1Password helper (recommended)?"; then
-                    # Try to find and run the helper
-                    local helper_paths=(
-                      "./helpers/1password-helper.sh"
-                      "$SCRIPT_DIR/helpers/1password-helper.sh"
-                      "$(dirname "${BASH_SOURCE[0]}")/../helpers/1password-helper.sh"
-                    )
-                    
-                    local helper_found=false
-                    for helper_path in "${helper_paths[@]}"; do
-                      if [[ -x "$helper_path" ]]; then
-                        info "Running interactive helper: $helper_path"
-                        if "$helper_path"; then
-                          success "Interactive helper completed successfully!"
-                          return 0
-                        else
-                          err "Interactive helper also failed"
-                          return 1
-                        fi
-                        helper_found=true
-                        break
-                      fi
-                    done
-                    
-                    if [[ "$helper_found" == "false" ]]; then
-                      err "Interactive helper not found at expected locations"
-                      return 1
-                    fi
-                  else
-                    if ! ask_yes_no "Try a different configuration method?"; then
-                      return 1
-                    fi
-                  fi
-                fi
-              else
-                err "Email is required"
-                if ! ask_yes_no "Try a different configuration method?"; then
-                  return 1
+                  echo "Basic configuration failed"
+                  exit 1
                 fi
               fi
+            '; then
+              success "Basic manual configuration completed successfully!"
+              break
             else
-              info "No default URL configured, using standard op account add..."
-              
-              # Try with DNS workaround if needed
-              local op_success=false
-              local dns_modified=false
-              
-              if timeout 30 op account add </dev/null 2>/tmp/op_error.log; then
-                op_success=true
+              local exit_code=$?
+              if [[ $exit_code -eq 124 ]]; then
+                err "Operation timed out after 2 minutes. This may indicate:"
+                echo "  • Network connectivity issues"
+                echo "  • DNS problems"
+                echo "  • 1Password server unavailability"
+                echo "  • Corporate firewall blocking the connection"
+                echo
+                echo "Try:"
+                echo "  • Check your internet connection"
+                echo "  • Verify the 1Password URL is correct"
+                echo "  • Try from a different network if possible"
+                echo "  • Use option 1 (Setup Code) instead"
               else
-                # Check for network/SSL errors and retry with DNS fix
-                if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
-                  warn "Network/SSL issue detected, trying with temporary DNS..."
-                  dns_modified=$(setup_temp_dns_for_op)
-                  
-                  if timeout 30 op account add </dev/null; then
-                    op_success=true
-                  fi
-                  
-                  if [[ "$dns_modified" == "true" ]]; then
-                    restore_dns_after_op
-                  fi
-                else
-                  # Show the original error if not SSL related
-                  cat /tmp/op_error.log >&2
-                fi
+                err "Basic manual configuration failed"
               fi
               
-              if [[ "$op_success" == "true" ]]; then
-                if signin_1password_cli; then
-                  success "Basic manual configuration completed successfully!"
-                  break
-                else
-                  err "Failed to sign in after manual configuration"
-                  if ! ask_yes_no "Try a different configuration method?"; then
-                    return 1
-                  fi
-                fi
-              else
-                err "Manual configuration failed"
-                if ! ask_yes_no "Try a different configuration method?"; then
-                  return 1
-                fi
+              if ! ask_yes_no "Try a different configuration method?"; then
+                return 1
               fi
             fi
+            
+
             ;;
           5)
             info "Skipping 1Password configuration"
