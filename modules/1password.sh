@@ -897,38 +897,56 @@ setup_1password_complete() {
                 export SSL_CERT_DIR=""
                 export SSL_CERT_FILE=""
                 
-                # Try with standard configuration first (with --signin flag for immediate authentication)
-                echo "When prompted, enter your 1Password Master Password and Secret Key"
+                # Try adding account first, then sign in separately
+                echo "Adding 1Password account..."
+                echo "You will need your Secret Key and Master Password"
                 echo "Secret Key format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
                 echo
                 
-                if eval "$(timeout --foreground 90 op account add --address "$address" --email "$email" --signin 2>/tmp/op_error.log)"; then
-                  op_success=true
+                # First try to add the account (this should be quick)
+                if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                  info "Account added successfully, now signing in..."
+                  
+                  # Now try to sign in to the account
+                  if eval "$(op signin --account "$address" 2>/tmp/op_signin.log)"; then
+                    op_success=true
+                    success "Successfully signed in to 1Password!"
+                  else
+                    warn "Account added but failed to sign in"
+                    cat /tmp/op_signin.log >&2
+                  fi
                 else
                   local exit_code=$?
                   # Check if it's a timeout or other error
                   if [[ $exit_code -eq 124 ]]; then
-                    warn "Command timed out after 90 seconds"
-                  elif grep -qi "couldn't connect\|ssl\|tls\|certificate\|missing OP_SECRET_KEY" /tmp/op_error.log 2>/dev/null; then
-                    warn "Network/SSL issue detected or authentication failed"
-                    
-                    # Setup temporary DNS
-                    dns_modified=$(setup_temp_dns_for_op)
-                    
-                    # Retry with temporary DNS
-                    echo "Retrying with alternative DNS configuration..."
-                    if eval "$(timeout --foreground 90 op account add --address "$address" --email "$email" --signin 2>/tmp/op_error.log)"; then
-                      op_success=true
-                    fi
-                    
-                    # Restore DNS if we modified it
-                    if [[ "$dns_modified" == "true" ]]; then
-                      restore_dns_after_op
-                    fi
+                    warn "Command timed out after 30 seconds"
                   else
-                    # Show the original error if not SSL related
+                    # Show the actual error
                     cat /tmp/op_error.log >&2
+                    
+                    # Check for specific issues
+                    if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                      warn "Network/SSL issue detected, trying with temporary DNS configuration..."
+                      
+                      # Setup temporary DNS
+                      dns_modified=$(setup_temp_dns_for_op)
+                      
+                      # Retry with temporary DNS
+                      echo "Retrying with alternative DNS configuration..."
+                      if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                        info "Account added with alternative DNS, now signing in..."
+                        if eval "$(op signin --account "$address")"; then
+                          op_success=true
+                          success "Successfully signed in to 1Password!"
+                        fi
+                      fi
+                    fi
                   fi
+                fi
+                    
+                # Restore DNS if we modified it
+                if [[ "$dns_modified" == "true" ]]; then
+                  restore_dns_after_op
                 fi
                 
                 if [[ "$op_success" == "true" ]]; then

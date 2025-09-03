@@ -143,15 +143,15 @@ vault_to_category() {
 # Sanitize name for filename
 sanitize_name() {
   local name="$1"
-  # Convert to lowercase, replace spaces/special chars with dashes
-  echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g'
+  # Convert to lowercase, replace spaces/special chars with dashes, limit length
+  echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g' | cut -c1-50
 }
 
-# Extract IP from server field
+# Extract IP from server field and sanitize for filename
 extract_ip() {
   local server="$1"
-  # Replace dots with dashes for filename
-  echo "$server" | sed 's/\./-/g'
+  # Remove protocol, extract hostname/IP, replace special chars with dashes, limit length
+  echo "$server" | sed 's|.*://||' | sed 's|/.*||' | sed 's/[^a-zA-Z0-9.-]/-/g' | sed 's/\./-/g' | sed 's/--*/-/g' | cut -c1-30
 }
 
 # Generate Remmina configuration file
@@ -184,11 +184,28 @@ generate_remmina_config() {
   sanitized_name=$(sanitize_name "$name")
   ip_part=$(extract_ip "$server")
   
+  # Validate components before creating filename
+  if [[ -z "$sanitized_name" ]]; then
+    sanitized_name="unknown"
+  fi
+  if [[ -z "$ip_part" ]]; then
+    ip_part="noserver"
+  fi
+  
   # Create filename: group_[category]_[name]_[ip].remmina
   filename="group_${category}_${sanitized_name}_${ip_part}.remmina"
   
+  # Additional validation - ensure filename is valid
+  if [[ ! "$filename" =~ ^[a-zA-Z0-9._-]+\.remmina$ ]]; then
+    warn "Invalid filename generated: $filename, using fallback"
+    filename="group_${category}_connection_$(date +%s).remmina"
+  fi
+  
   # Ensure remmina directory exists
   mkdir -p "$remmina_dir"
+  
+  # Debug: Show what we're creating
+  info "Creating: $filename"
   
   # Generate configuration file
   cat > "$remmina_dir/$filename" << EOF
@@ -424,7 +441,7 @@ process_server_item() {
   
   # Validate required fields with detailed debugging
   if [[ -z "$server_field" || "$server_field" == "null" ]]; then
-    warn "No server/hostname found for: $item_title"
+    warn "Skipping $item_title: No server/hostname found"
     if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
       info "Available fields that might contain server info:"
       echo "$item_details" | jq -r '.fields[]? | select(.label | test("server|hostname|address|ip|host"; "i")) | "  \(.label): \(.value // "NO_VALUE")"' 2>/dev/null
@@ -444,7 +461,7 @@ process_server_item() {
   fi
   
   if [[ -z "$password_field" || "$password_field" == "null" ]]; then
-    warn "No password found for: $item_title"
+    warn "Skipping $item_title: No password found"
     if [[ "${DEBUG_REMMINA:-false}" == "true" ]]; then
       info "Available fields that might contain password info:"
       echo "$item_details" | jq -r '.fields[]? | select(.label | test("password|pass|senha|secret|chave"; "i")) | "  \(.label): \(.value // "NO_VALUE")"' 2>/dev/null
