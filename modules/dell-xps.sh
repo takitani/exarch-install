@@ -572,18 +572,20 @@ install_dell_xps_power_management() {
         
         # Find thermald binary in common locations
         local thermald_binary=""
-        for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
-          if [[ -f "$path" ]]; then
-            thermald_binary="$path"
-            break
-          fi
-        done
+        # Find thermald binary from package contents
+        thermald_binary=$(pacman -Ql thermald 2>/dev/null | grep -E "/thermald$" | head -1)
         
-        if [[ -n "$thermald_binary" ]]; then
+        if [[ -n "$thermald_binary" && -f "$thermald_binary" ]]; then
           info "thermald binary found at: $thermald_binary"
         else
-          warn "thermald binary not found in common locations, checking package contents..."
-          pacman -Ql thermald | grep -E "(thermald|bin/)" | head -5
+          # Check if it's in common locations as fallback
+          for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+            if [[ -f "$path" ]]; then
+              thermald_binary="$path"
+              info "thermald binary found at: $thermald_binary"
+              break
+            fi
+          done
         fi
       fi
     else
@@ -600,18 +602,20 @@ install_dell_xps_power_management() {
         
         # Find thermald binary in common locations
         local thermald_binary=""
-        for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
-          if [[ -f "$path" ]]; then
-            thermald_binary="$path"
-            break
-          fi
-        done
+        # Find thermald binary from package contents
+        thermald_binary=$(pacman -Ql thermald 2>/dev/null | grep -E "/thermald$" | head -1)
         
-        if [[ -n "$thermald_binary" ]]; then
+        if [[ -n "$thermald_binary" && -f "$thermald_binary" ]]; then
           info "thermald binary found at: $thermald_binary"
         else
-          warn "thermald binary not found in common locations, checking package contents..."
-          yay -Ql thermald | grep -E "(thermald|bin/)" | head -5
+          # Check if it's in common locations as fallback
+          for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+            if [[ -f "$path" ]]; then
+              thermald_binary="$path"
+              info "thermald binary found at: $thermald_binary"
+              break
+            fi
+          done
         fi
       fi
     else
@@ -631,15 +635,21 @@ install_dell_xps_power_management() {
     
     # Only configure thermald if it was successfully installed and binary exists
     local thermald_binary=""
-    for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
-      if [[ -f "$path" ]]; then
-        thermald_binary="$path"
-        break
-      fi
-    done
+    # Find thermald binary from package contents first
+    thermald_binary=$(pacman -Ql thermald 2>/dev/null | grep -E "/thermald$" | head -1)
     
-    if [[ "$thermald_installed" == "true" ]] && [[ -n "$thermald_binary" ]]; then
-      info "thermald binary verified, configuring service..."
+    # Fallback to common locations if not found in package
+    if [[ -z "$thermald_binary" ]]; then
+      for path in "/usr/bin/thermald" "/usr/sbin/thermald" "/usr/local/bin/thermald"; do
+        if [[ -f "$path" ]]; then
+          thermald_binary="$path"
+          break
+        fi
+      done
+    fi
+    
+    if [[ "$thermald_installed" == "true" ]] && [[ -n "$thermald_binary" && -f "$thermald_binary" ]]; then
+      info "thermald binary verified at $thermald_binary, configuring service..."
       
       # Check if thermald service exists, create if not
       if [[ ! -f /usr/lib/systemd/system/thermald.service ]] && [[ ! -f /etc/systemd/system/thermald.service ]]; then
@@ -828,20 +838,22 @@ install_dell_utilities() {
     if pacman -Q fwupd >/dev/null 2>&1; then
       info "fwupd package verified as installed"
       
-      # Find fwupd binary in common locations
+      # Find fwupd binary from package contents
       local fwupd_binary=""
-      for path in "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
-        if [[ -f "$path" ]]; then
-          fwupd_binary="$path"
-          break
-        fi
-      done
+      # Look for fwupdmgr (the user command) or fwupd daemon
+      fwupd_binary=$(pacman -Ql fwupd 2>/dev/null | grep -E "/(fwupdmgr|fwupd)$" | head -1)
       
-      if [[ -n "$fwupd_binary" ]]; then
+      if [[ -n "$fwupd_binary" && -f "$fwupd_binary" ]]; then
         info "fwupd binary found at: $fwupd_binary"
       else
-        warn "fwupd binary not found in common locations, checking package contents..."
-        pacman -Ql fwupd | grep -E "(fwupd|bin/)" | head -5
+        # Check if it's in common locations as fallback
+        for path in "/usr/bin/fwupdmgr" "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
+          if [[ -f "$path" ]]; then
+            fwupd_binary="$path"
+            info "fwupd binary found at: $fwupd_binary"
+            break
+          fi
+        done
       fi
     fi
   else
@@ -850,15 +862,21 @@ install_dell_utilities() {
   
   # Only configure fwupd if it was successfully installed and binary exists
   local fwupd_binary=""
-  for path in "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
-    if [[ -f "$path" ]]; then
-      fwupd_binary="$path"
-      break
-    fi
-  done
+  # Find fwupd binary from package contents first
+  fwupd_binary=$(pacman -Ql fwupd 2>/dev/null | grep -E "/(fwupdmgr|fwupd)$" | head -1)
   
-  if [[ "$fwupd_installed" == "true" ]] && [[ -n "$fwupd_binary" ]]; then
-    info "fwupd binary verified, configuring service..."
+  # Fallback to common locations if not found in package
+  if [[ -z "$fwupd_binary" ]]; then
+    for path in "/usr/bin/fwupdmgr" "/usr/bin/fwupd" "/usr/sbin/fwupd" "/usr/local/bin/fwupd"; do
+      if [[ -f "$path" ]]; then
+        fwupd_binary="$path"
+        break
+      fi
+    done
+  fi
+  
+  if [[ "$fwupd_installed" == "true" ]] && [[ -n "$fwupd_binary" && -f "$fwupd_binary" ]]; then
+    info "fwupd binary verified at $fwupd_binary, configuring service..."
     
     if ! is_debug_mode; then
       # Check if fwupd service exists, create if not
