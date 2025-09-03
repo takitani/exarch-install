@@ -749,7 +749,7 @@ EOF
 
 # Setup dual keyboard layout (BR + US International)
 setup_dual_keyboard_dell_xps() {
-  if [[ "${SETUP_DUAL_KEYBOARD:-false}" != "true" ]]; then
+  if [[ "${SETUP_DELL_XPS_KEYBOARD:-false}" != "true" ]]; then
     return 0
   fi
   
@@ -1069,8 +1069,20 @@ configure_dell_xps_kernel_params() {
 
 # Main Dell XPS setup function
 setup_dell_xps_9320_complete() {
-  if [[ "${SETUP_DELL_XPS_9320:-false}" != "true" ]]; then
-    info "Skipping Dell XPS 13 Plus setup (not selected)"
+  # Check if any Dell XPS optimizations are enabled
+  local has_optimizations=false
+  
+  if [[ "${SETUP_DELL_XPS_WEBCAM:-false}" == "true" ]] || \
+     [[ "${SETUP_DELL_XPS_POWER:-false}" == "true" ]] || \
+     [[ "${SETUP_DELL_XPS_KEYBOARD:-false}" == "true" ]] || \
+     [[ "${SETUP_DELL_XPS_UTILITIES:-false}" == "true" ]] || \
+     [[ "${SETUP_DELL_XPS_SHUTDOWN:-false}" == "true" ]] || \
+     [[ "${SETUP_DELL_XPS_KERNEL:-false}" == "true" ]]; then
+    has_optimizations=true
+  fi
+  
+  if [[ "$has_optimizations" == "false" ]]; then
+    info "Skipping Dell XPS 13 Plus setup (no optimizations selected)"
     return 0
   fi
   
@@ -1084,22 +1096,36 @@ setup_dell_xps_9320_complete() {
   info "Setting up Dell XPS 13 Plus (9320) optimizations..."
   
   # Webcam drivers
-  setup_dell_xps_9320_webcam
+  if [[ "${SETUP_DELL_XPS_WEBCAM:-false}" == "true" ]]; then
+    setup_dell_xps_9320_webcam
+  fi
   
   # Power management
-  install_dell_xps_power_management
-  configure_tlp_dell_xps
+  if [[ "${SETUP_DELL_XPS_POWER:-false}" == "true" ]]; then
+    install_dell_xps_power_management
+    configure_tlp_dell_xps
+  fi
   
   # Keyboard layout
-  setup_dual_keyboard_dell_xps
+  if [[ "${SETUP_DELL_XPS_KEYBOARD:-false}" == "true" ]]; then
+    setup_dual_keyboard_dell_xps
+  fi
   
   # Dell utilities
-  install_dell_utilities
+  if [[ "${SETUP_DELL_XPS_UTILITIES:-false}" == "true" ]]; then
+    install_dell_utilities
+  fi
   
   # Create shutdown hooks to prevent hanging (IMPORTANT FIX)
-  create_dell_xps_shutdown_hook
-  create_dell_xps_shutdown_service
-  configure_dell_xps_kernel_params
+  if [[ "${SETUP_DELL_XPS_SHUTDOWN:-false}" == "true" ]]; then
+    create_dell_xps_shutdown_hook
+    create_dell_xps_shutdown_service
+  fi
+  
+  # Kernel parameters optimization
+  if [[ "${SETUP_DELL_XPS_KERNEL:-false}" == "true" ]]; then
+    configure_dell_xps_kernel_params
+  fi
   
   success "Dell XPS 13 Plus setup completed!"
   
@@ -1113,26 +1139,43 @@ show_dell_xps_post_install_info() {
   echo -e "${BOLD}Dell XPS 13 Plus Post-Installation Info${NC}"
   echo "======================================="
   
-  echo -e "\n${CYAN}Webcam:${NC}"
-  echo "• IPU6 drivers installed"
-  echo "• Reboot required for webcam to work"
-  echo "• Test with: cheese or other camera app"
+  if [[ "${SETUP_DELL_XPS_WEBCAM:-false}" == "true" ]]; then
+    echo -e "\n${CYAN}Webcam:${NC}"
+    echo "• IPU6 drivers installed"
+    echo "• Reboot required for webcam to work"
+    echo "• Test with: cheese or other camera app"
+  fi
   
-  echo -e "\n${CYAN}Power Management:${NC}"
-  echo "• TLP configured for battery optimization"
-  echo "• Battery charging limited to 40-80%"
-  echo "• Thermal management active"
+  if [[ "${SETUP_DELL_XPS_POWER:-false}" == "true" ]]; then
+    echo -e "\n${CYAN}Power Management:${NC}"
+    echo "• TLP configured for battery optimization"
+    echo "• Battery charging limited to 40-80%"
+    echo "• Thermal management active"
+  fi
   
-  if [[ "${SETUP_DUAL_KEYBOARD:-false}" == "true" ]]; then
+  if [[ "${SETUP_DELL_XPS_KEYBOARD:-false}" == "true" ]]; then
     echo -e "\n${CYAN}Keyboard:${NC}"
     echo "• Dual layout: Brazilian + US International"
     echo "• Toggle with: Alt+Shift"
   fi
   
-  echo -e "\n${CYAN}Shutdown Fix:${NC}"
-  echo "• Shutdown hooks installed to prevent freezing"
-  echo "• Kernel parameters added for reliable reboot"
-  echo "• Services will stop gracefully during shutdown"
+  if [[ "${SETUP_DELL_XPS_UTILITIES:-false}" == "true" ]]; then
+    echo -e "\n${CYAN}Dell Utilities:${NC}"
+    echo "• fwupd for firmware updates"
+    echo "• Dell Command Configure (if available)"
+  fi
+  
+  if [[ "${SETUP_DELL_XPS_SHUTDOWN:-false}" == "true" ]]; then
+    echo -e "\n${CYAN}Shutdown Fix:${NC}"
+    echo "• Shutdown hooks installed to prevent freezing"
+    echo "• Services will stop gracefully during shutdown"
+  fi
+  
+  if [[ "${SETUP_DELL_XPS_KERNEL:-false}" == "true" ]]; then
+    echo -e "\n${CYAN}Kernel Optimization:${NC}"
+    echo "• Kernel parameters added for reliable reboot"
+    echo "• Performance optimizations applied"
+  fi
   
   echo -e "\n${CYAN}Next Steps:${NC}"
   echo "• Reboot to activate all drivers and kernel parameters"
@@ -1369,7 +1412,7 @@ cleanup_dell_xps_services() {
 # Export all functions at the end after they are defined
 export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
 export -f install_ipu6_drivers configure_dell_xps_kernel_modules
-export -f install_dell_xps_power_management configure_tlp_dell_xps
+export - configure_tlp_dell_xps
 export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info

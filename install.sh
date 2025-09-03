@@ -167,8 +167,12 @@ show_menu() {
   # Show XPS menu if: hardware contains XPS, or FORCE_XPS is set, or is_xps_mode returns true
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]] || is_xps_mode; then
     show_menu_category "Dell XPS 13 Plus" "100" \
-      "SETUP_DELL_XPS_9320:XPS 13 Plus optimizations (webcam, power)" \
-      "SETUP_DUAL_KEYBOARD:Dual keyboard support (BR+US)"
+      "SETUP_DELL_XPS_WEBCAM:Webcam drivers (IPU6 + IVSC firmware)" \
+      "SETUP_DELL_XPS_POWER:Power management (TLP + battery optimization)" \
+      "SETUP_DELL_XPS_KEYBOARD:Dual keyboard layout (BR + US International)" \
+      "SETUP_DELL_XPS_UTILITIES:Dell utilities (fwupd, command-configure)" \
+      "SETUP_DELL_XPS_SHUTDOWN:Shutdown fixes (prevent hanging)" \
+      "SETUP_DELL_XPS_KERNEL:Kernel parameters optimization"
   fi
   
   echo
@@ -253,8 +257,12 @@ interactive_menu() {
   
   if [[ "$hw_info" == *"XPS"* ]] || [[ "$FORCE_XPS" == true ]]; then
     echo -e "${YELLOW}🔍 Dell XPS detected - auto-enabling hardware optimizations...${NC}"
-    SETUP_DELL_XPS_9320=true
-    SETUP_DUAL_KEYBOARD=true
+    SETUP_DELL_XPS_WEBCAM=true
+    SETUP_DELL_XPS_POWER=true
+    SETUP_DELL_XPS_KEYBOARD=true
+    SETUP_DELL_XPS_UTILITIES=true
+    SETUP_DELL_XPS_SHUTDOWN=true
+    SETUP_DELL_XPS_KERNEL=true
     echo -e "${GREEN}✓ XPS optimizations enabled${NC}"
     sleep 2
   fi
@@ -371,8 +379,12 @@ apply_profile() {
       INSTALL_AGE=true
       SETUP_DOTFILES_MANAGEMENT=true
       SETUP_DEV_PGPASS=true
-      SETUP_DELL_XPS_9320=true
-      SETUP_DUAL_KEYBOARD=true
+      SETUP_DELL_XPS_WEBCAM=true
+      SETUP_DELL_XPS_POWER=true
+      SETUP_DELL_XPS_KEYBOARD=true
+      SETUP_DELL_XPS_UTILITIES=true
+      SETUP_DELL_XPS_SHUTDOWN=true
+      SETUP_DELL_XPS_KERNEL=true
       GENERATE_REMMINA_CONNECTIONS=true
       FIX_CURSOR_INPUT_METHOD=true
       SETUP_GNOME_KEYRING=false
@@ -412,8 +424,12 @@ apply_profile() {
       SETUP_DEV_PGPASS=false
       SETUP_SSH_KEYS=false
       SETUP_PTBR_KEYBOARD_LAYOUT=false
-      SETUP_DELL_XPS_9320=false
-      SETUP_DUAL_KEYBOARD=false
+      SETUP_DELL_XPS_WEBCAM=false
+      SETUP_DELL_XPS_POWER=false
+      SETUP_DELL_XPS_KEYBOARD=false
+      SETUP_DELL_XPS_UTILITIES=false
+      SETUP_DELL_XPS_SHUTDOWN=false
+      SETUP_DELL_XPS_KERNEL=false
       GENERATE_REMMINA_CONNECTIONS=false
       FIX_CURSOR_INPUT_METHOD=false
       SETUP_GNOME_KEYRING=false
@@ -563,6 +579,12 @@ apply_profile() {
       INSTALL_AGE=false
       SETUP_DOTFILES_MANAGEMENT=false
       SETUP_DEV_PGPASS=false
+      SETUP_DELL_XPS_WEBCAM=true
+      SETUP_DELL_XPS_POWER=true
+      SETUP_DELL_XPS_KEYBOARD=true
+      SETUP_DELL_XPS_UTILITIES=true
+      SETUP_DELL_XPS_SHUTDOWN=true
+      SETUP_DELL_XPS_KERNEL=true
       GENERATE_REMMINA_CONNECTIONS=false
       echo -e "${GREEN}✓ Dell XPS profile applied - hardware optimizations enabled${NC}"
       ;;
@@ -762,15 +784,23 @@ toggle_system_config_group() {
 # Toggle Dell XPS group
 toggle_dell_xps_group() {
   local current_state
-  current_state=$(check_group_state "SETUP_DELL_XPS_9320" "SETUP_DUAL_KEYBOARD")
+  current_state=$(check_group_state "SETUP_DELL_XPS_WEBCAM" "SETUP_DELL_XPS_POWER" "SETUP_DELL_XPS_KEYBOARD" "SETUP_DELL_XPS_UTILITIES" "SETUP_DELL_XPS_SHUTDOWN" "SETUP_DELL_XPS_KERNEL")
   
   if [[ "$current_state" == "all_true" ]]; then
-    SETUP_DELL_XPS_9320=false
-    SETUP_DUAL_KEYBOARD=false
+    SETUP_DELL_XPS_WEBCAM=false
+    SETUP_DELL_XPS_POWER=false
+    SETUP_DELL_XPS_KEYBOARD=false
+    SETUP_DELL_XPS_UTILITIES=false
+    SETUP_DELL_XPS_SHUTDOWN=false
+    SETUP_DELL_XPS_KERNEL=false
     echo -e "${YELLOW}✗ Dell XPS group disabled${NC}"
   else
-    SETUP_DELL_XPS_9320=true
-    SETUP_DUAL_KEYBOARD=true
+    SETUP_DELL_XPS_WEBCAM=true
+    SETUP_DELL_XPS_POWER=true
+    SETUP_DELL_XPS_KEYBOARD=true
+    SETUP_DELL_XPS_UTILITIES=true
+    SETUP_DELL_XPS_SHUTDOWN=true
+    SETUP_DELL_XPS_KERNEL=true
     echo -e "${GREEN}✓ Dell XPS group enabled${NC}"
   fi
 }
@@ -852,6 +882,12 @@ toggle_option() {
     37) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
     38) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
     39) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    101) SETUP_DELL_XPS_WEBCAM=$([ "$SETUP_DELL_XPS_WEBCAM" == true ] && echo false || echo true) ;;
+    102) SETUP_DELL_XPS_POWER=$([ "$SETUP_DELL_XPS_POWER" == true ] && echo false || echo true) ;;
+    103) SETUP_DELL_XPS_KEYBOARD=$([ "$SETUP_DELL_XPS_KEYBOARD" == true ] && echo false || echo true) ;;
+    104) SETUP_DELL_XPS_UTILITIES=$([ "$SETUP_DELL_XPS_UTILITIES" == true ] && echo false || echo true) ;;
+    105) SETUP_DELL_XPS_SHUTDOWN=$([ "$SETUP_DELL_XPS_SHUTDOWN" == true ] && echo false || echo true) ;;
+    106) SETUP_DELL_XPS_KERNEL=$([ "$SETUP_DELL_XPS_KERNEL" == true ] && echo false || echo true) ;;
     *)
       return 1
       ;;
@@ -1423,7 +1459,7 @@ module_enabled() {
       [[ "${ENABLE_REMMINA_MODULE:-true}" == "true" ]] && [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]
       ;;
     "dell-xps") 
-      [[ "${ENABLE_DELL_XPS_MODULE:-true}" == "true" ]] && [[ "${SETUP_DELL_XPS_9320:-false}" == "true" ]]
+      [[ "${ENABLE_DELL_XPS_MODULE:-true}" == "true" ]] && ([[ "${SETUP_DELL_XPS_WEBCAM:-false}" == "true" ]] || [[ "${SETUP_DELL_XPS_POWER:-false}" == "true" ]] || [[ "${SETUP_DELL_XPS_KEYBOARD:-false}" == "true" ]] || [[ "${SETUP_DELL_XPS_UTILITIES:-false}" == "true" ]] || [[ "${SETUP_DELL_XPS_SHUTDOWN:-false}" == "true" ]] || [[ "${SETUP_DELL_XPS_KERNEL:-false}" == "true" ]])
       ;;
     "dotfiles")
       [[ "${ENABLE_DOTFILES_MODULE:-true}" == "true" ]] && [[ "${SETUP_DOTFILES_MANAGEMENT:-false}" == "true" ]]
