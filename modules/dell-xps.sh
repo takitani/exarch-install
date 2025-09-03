@@ -399,12 +399,13 @@ configure_dell_xps_kernel_modules() {
   add_sudo_command "install -Dm644 $tmpfile $modules_file && rm -f $tmpfile"
 
   info "Kernel modules configured: $modules_file (${modules[*]})"
-
-  # Load modules immediately, but avoid blocking if something goes wrong
+  
+  # IMPORTANT: Do NOT load modules immediately to avoid shutdown/reboot hangs
+  # The modules will be loaded automatically on next boot via modules-load.d
+  info "NOTE: IPU6 modules will be loaded on next boot to avoid shutdown issues"
+  info "If you need to load them manually now (may cause shutdown hang):"
   for module in "${modules[@]}"; do
-    if ! lsmod | grep -q "^${module//-/[_-]} "; then
-      add_sudo_command "(command -v timeout >/dev/null 2>&1 && timeout 3 modprobe -q $module) || modprobe -q $module || true"
-    fi
+    info "  sudo modprobe $module"
   done
 }
 
