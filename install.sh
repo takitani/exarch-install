@@ -93,6 +93,7 @@ source "$SCRIPT_DIR/modules/pipewire-camera.sh"
 source "$SCRIPT_DIR/modules/espanso.sh"
 source "$SCRIPT_DIR/modules/gnome-keyring.sh"
 source "$SCRIPT_DIR/modules/keyboard-layout.sh"
+source "$SCRIPT_DIR/modules/signal-shortcut.sh"
 source "$SCRIPT_DIR/modules/windows-docker.sh"
 
 # ======================================
@@ -125,6 +126,7 @@ show_menu() {
   # Package categories
   show_menu_category "Web Browsers" "10" \
     "INSTALL_GOOGLE_CHROME:Google Chrome" \
+    "INSTALL_MICROSOFT_EDGE:Microsoft Edge" \
     "INSTALL_FIREFOX:Firefox"
     
   show_menu_category "Productivity Tools" "20" \
@@ -369,6 +371,7 @@ apply_profile() {
     "all")
       # Select all options
       INSTALL_GOOGLE_CHROME=true
+      INSTALL_MICROSOFT_EDGE=true
       INSTALL_FIREFOX=true
       INSTALL_COPYQ=true
       INSTALL_DROPBOX=true
@@ -411,6 +414,7 @@ apply_profile() {
     "none")
       # Disable all options
       INSTALL_GOOGLE_CHROME=false
+      INSTALL_MICROSOFT_EDGE=false
       INSTALL_FIREFOX=false
       INSTALL_COPYQ=false
       INSTALL_DROPBOX=false
@@ -491,9 +495,11 @@ apply_profile() {
       GENERATE_REMMINA_CONNECTIONS=false
       FIX_CURSOR_INPUT_METHOD=false
       SETUP_PTBR_KEYBOARD_LAYOUT=true
+      REMOVE_SIGNAL_SHORTCUT=true
       ;;
     "development")
       INSTALL_GOOGLE_CHROME=true
+      INSTALL_MICROSOFT_EDGE=false
       INSTALL_FIREFOX=true
       INSTALL_COPYQ=true
       INSTALL_DROPBOX=true
@@ -864,20 +870,28 @@ toggle_option() {
     110) toggle_dell_xps_group ;;
     
     # Individual toggles
-    0) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
-    1) INSTALL_FIREFOX=$([ "$INSTALL_FIREFOX" == true ] && echo false || echo true) ;;
-    2) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
-    3) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
-    4) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
-    5) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
-    6) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
-    7) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
-    8) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
-    9) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
-    10) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
-    11) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
-    12) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
-    13) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    # Web Browsers (11-13)
+    11) INSTALL_GOOGLE_CHROME=$([ "$INSTALL_GOOGLE_CHROME" == true ] && echo false || echo true) ;;
+    12) INSTALL_MICROSOFT_EDGE=$([ "$INSTALL_MICROSOFT_EDGE" == true ] && echo false || echo true) ;;
+    13) INSTALL_FIREFOX=$([ "$INSTALL_FIREFOX" == true ] && echo false || echo true) ;;
+    
+    # Productivity (21-29)
+    21) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
+    22) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
+    23) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
+    24) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
+    25) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
+    26) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
+    27) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
+    28) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
+    
+    # Text Editors (41-42)
+    41) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
+    42) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
+    
+    # Communication (61-62)  
+    61) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
+    62) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
     54) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
     55) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
     56) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
@@ -910,6 +924,7 @@ toggle_option() {
     99) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
     100) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
     101) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
+    102) REMOVE_SIGNAL_SHORTCUT=$([ "$REMOVE_SIGNAL_SHORTCUT" == true ] && echo false || echo true) ;;
 
     81) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
     82) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
@@ -1429,6 +1444,11 @@ execute_installation_modules() {
     setup_ptbr_keyboard_layout
   fi
   
+  # Remove Signal shortcut
+  if [[ "${REMOVE_SIGNAL_SHORTCUT:-false}" == "true" ]]; then
+    remove_signal_shortcut
+  fi
+  
   # Windows Docker setup
   if [[ "${INSTALL_WINDOWS_DOCKER:-false}" == "true" ]]; then
     setup_windows_docker_complete
@@ -1458,6 +1478,7 @@ install_desktop_applications() {
   
   # Browsers
   [[ "${INSTALL_GOOGLE_CHROME:-true}" == "true" ]] && apps_to_install+=("google-chrome")
+  [[ "${INSTALL_MICROSOFT_EDGE:-false}" == "true" ]] && apps_to_install+=("microsoft-edge-stable-bin")
   [[ "${INSTALL_FIREFOX:-true}" == "true" ]] && apps_to_install+=("firefox")
   
   # Productivity
@@ -1628,6 +1649,10 @@ show_final_report() {
   
   if [[ "${SETUP_PTBR_KEYBOARD_LAYOUT:-false}" == "true" ]]; then
     echo "• PT-BR keyboard layout configured for US keyboards"
+  fi
+  
+  if [[ "${REMOVE_SIGNAL_SHORTCUT:-false}" == "true" ]]; then
+    echo "• Signal shortcut (Super+G) removed from Hyprland configuration"
   fi
   
   echo "• Log files saved to: $LOG_DIR"
