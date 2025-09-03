@@ -1728,7 +1728,89 @@ EOF
 # MAIN FUNCTION
 # ======================================
 
+# Function to disable screensaver/idle during installation
+disable_screensaver() {
+  info "Disabling screensaver/idle during installation..."
+  
+  # Kill hypridle if it's running
+  if pgrep -x "hypridle" >/dev/null; then
+    info "Stopping hypridle service..."
+    pkill -x "hypridle" 2>/dev/null || true
+    export HYPRIDLE_WAS_RUNNING=true
+  else
+    export HYPRIDLE_WAS_RUNNING=false
+  fi
+  
+  # Prevent screen from turning off
+  if command -v hyprctl >/dev/null 2>&1; then
+    hyprctl dispatch dpms on 2>/dev/null || true
+  fi
+  
+  # Prevent system sleep/idle with systemd-inhibit
+  if command -v systemd-inhibit >/dev/null 2>&1; then
+    # Start inhibit in background
+    systemd-inhibit --what=idle:sleep:handle-lid-switch \
+                   --who="exarch-install" \
+                   --why="Installation in progress - preventing screen lock" \
+                   --mode=block \
+                   bash -c 'while true; do sleep 30; done' &
+    export INHIBIT_PID=$!
+    info "System sleep/idle inhibited (PID: $INHIBIT_PID)"
+  fi
+  
+  # Also try to prevent gnome-screensaver if present
+  if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.screensaver idle-activation-enabled false 2>/dev/null || true
+    gsettings set org.gnome.desktop.session idle-delay 0 2>/dev/null || true
+    export GNOME_SCREENSAVER_DISABLED=true
+  else
+    export GNOME_SCREENSAVER_DISABLED=false
+  fi
+}
+
+# Function to restore screensaver/idle after installation
+restore_screensaver() {
+  info "Restoring screensaver/idle settings..."
+  
+  # Kill the systemd inhibit process
+  if [[ -n "${INHIBIT_PID:-}" ]]; then
+    kill "$INHIBIT_PID" 2>/dev/null || true
+    info "System sleep/idle inhibition removed"
+  fi
+  
+  # Restore gnome screensaver settings
+  if [[ "${GNOME_SCREENSAVER_DISABLED:-false}" == "true" ]]; then
+    if command -v gsettings >/dev/null 2>&1; then
+      gsettings reset org.gnome.desktop.screensaver idle-activation-enabled 2>/dev/null || true
+      gsettings reset org.gnome.desktop.session idle-delay 2>/dev/null || true
+    fi
+  fi
+  
+  # Restart hypridle if it was running before
+  if [[ "${HYPRIDLE_WAS_RUNNING:-false}" == "true" ]]; then
+    info "Restarting hypridle service..."
+    if command -v hypridle >/dev/null 2>&1; then
+      hypridle &
+      info "hypridle restarted"
+    fi
+  fi
+}
+
+# Cleanup function for script exit
+cleanup_on_exit() {
+  echo
+  info "Script interrupted or finished - restoring system settings..."
+  restore_screensaver
+  echo "Cleanup completed."
+}
+
+# Set up exit trap
+trap cleanup_on_exit EXIT INT TERM
+
 main() {
+  # Disable screensaver at start
+  disable_screensaver
+  
   # Load configuration from all sources
   if ! load_configuration "$@"; then
     err "Failed to load configuration"
