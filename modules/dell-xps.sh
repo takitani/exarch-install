@@ -749,6 +749,7 @@ USB_BLACKLIST_WWAN=1
 PCIE_ASPM_ON_AC=default
 PCIE_ASPM_ON_BAT=powersave
 EOF
+"
 
   success "TLP optimized for Dell XPS 13 Plus"
 }
@@ -792,6 +793,7 @@ Section "InputClass"
     Option "XkbOptions" "grp:alt_shift_toggle,grp_led:scroll"
 EndSection
 EOF
+"
 
   success "Dual keyboard layout configured"
   info "Use Alt+Shift to toggle between BR and US International"
@@ -946,6 +948,7 @@ sync
 echo "Dell XPS shutdown cleanup completed"
 exit 0
 EOF
+"
 
   # Make executable
   add_sudo_command "chmod +x $hook_file"
@@ -1008,6 +1011,7 @@ KillMode=none
 [Install]
 WantedBy=multi-user.target
 EOF
+"
 
   # Enable the service
   add_sudo_command "systemctl daemon-reload"
@@ -1216,7 +1220,7 @@ TimeoutSec=0
 [Install]
 WantedBy=multi-user.target
 EOF
-'
+"
 
   # Reload systemd
   add_sudo_command "systemctl daemon-reload"
@@ -1252,7 +1256,7 @@ RestartSec=1
 [Install]
 WantedBy=multi-user.target
 EOF
-'
+"
 
   # Reload systemd
   add_sudo_command "systemctl daemon-reload"
@@ -1288,7 +1292,7 @@ RestartSec=1
 [Install]
 WantedBy=multi-user.target
 EOF
-'
+"
 
   # Reload systemd
   add_sudo_command "systemctl daemon-reload"
@@ -1420,7 +1424,7 @@ cleanup_dell_xps_services() {
 # Export all functions at the end after they are defined
 export -f setup_dell_xps_9320_webcam install_ivsc_firmware install_ivsc_firmware_manual
 export -f install_ipu6_drivers configure_dell_xps_kernel_modules
-export - configure_tlp_dell_xps
+export -f configure_tlp_dell_xps
 export -f check_package_available check_aur_available install_tlp_manual install_tlp_rdw_manual
 export -f setup_dual_keyboard_dell_xps install_dell_utilities
 export -f setup_dell_xps_9320_complete show_dell_xps_post_install_info
