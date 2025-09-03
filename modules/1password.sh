@@ -13,6 +13,30 @@
 # OP_DEVICE=false  # Prevent device authentication (CLI-only mode)
 export ONEPASSWORD_CLI_ONLY="${ONEPASSWORD_CLI_ONLY:-false}"  # CLI-only mode flag
 
+# Setup temporary DNS for 1Password operations
+setup_temp_dns_for_op() {
+  local dns_modified=false
+  
+  # Only modify DNS if we're having connectivity issues
+  if [[ -f /etc/resolv.conf ]] && [[ ! -f /tmp/resolv.conf.op.backup ]]; then
+    info "Setting up temporary DNS for 1Password connection..."
+    sudo cp /etc/resolv.conf /tmp/resolv.conf.op.backup
+    echo -e "nameserver 8.8.8.8\nnameserver 1.1.1.1" | sudo tee /etc/resolv.conf > /dev/null
+    dns_modified=true
+    sleep 2  # Give DNS time to propagate
+  fi
+  
+  echo "$dns_modified"
+}
+
+# Restore DNS after 1Password operations
+restore_dns_after_op() {
+  if [[ -f /tmp/resolv.conf.op.backup ]]; then
+    info "Restoring original DNS configuration..."
+    sudo mv /tmp/resolv.conf.op.backup /etc/resolv.conf
+  fi
+}
+
 # Function to auto-enable 1Password related features
 auto_enable_1password_features() {
   local feature="$1"
@@ -357,7 +381,28 @@ configure_1password_cli_direct() {
         read -r email
         
         # Let user paste the Setup Code and op will extract the Secret Key
-        if op account add --address "${clean_url}" --email "${email}"; then
+        local op_success=false
+        local dns_modified=false
+        
+        if op account add --address "${clean_url}" --email "${email}" 2>/tmp/op_error.log; then
+          op_success=true
+        else
+          # Check for network/SSL errors and retry with DNS fix if needed
+          if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+            warn "Network/SSL issue detected, trying with temporary DNS..."
+            dns_modified=$(setup_temp_dns_for_op)
+            
+            if op account add --address "${clean_url}" --email "${email}"; then
+              op_success=true
+            fi
+            
+            if [[ "$dns_modified" == "true" ]]; then
+              restore_dns_after_op
+            fi
+          fi
+        fi
+        
+        if [[ "$op_success" == "true" ]]; then
           success "Account added via Setup Code!"
           return 0
         else
@@ -423,7 +468,28 @@ configure_1password_cli_direct() {
       echo
       info "Adding account..."
       
-      if op account add --address "$url" --email "$email" --secret-key "$secret_key"; then
+      local op_success=false
+      local dns_modified=false
+      
+      if op account add --address "$url" --email "$email" --secret-key "$secret_key" 2>/tmp/op_error.log; then
+        op_success=true
+      else
+        # Check for network/SSL errors and retry with DNS fix if needed
+        if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+          warn "Network/SSL issue detected, trying with temporary DNS..."
+          dns_modified=$(setup_temp_dns_for_op)
+          
+          if op account add --address "$url" --email "$email" --secret-key "$secret_key"; then
+            op_success=true
+          fi
+          
+          if [[ "$dns_modified" == "true" ]]; then
+            restore_dns_after_op
+          fi
+        fi
+      fi
+      
+      if [[ "$op_success" == "true" ]]; then
         success "Account added via manual data!"
         return 0
       else
@@ -696,7 +762,29 @@ setup_1password_complete() {
                 echo "Using configured address: $address"
                 echo -n "Enter email: "
                 read -r email
-                if op account add --address "$address" --email "$email"; then
+                
+                local op_success=false
+                local dns_modified=false
+                
+                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                  op_success=true
+                else
+                  # Check for network/SSL errors and retry with DNS fix if needed
+                  if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                    warn "Network/SSL issue detected, trying with temporary DNS..."
+                    dns_modified=$(setup_temp_dns_for_op)
+                    
+                    if op account add --address "$address" --email "$email"; then
+                      op_success=true
+                    fi
+                    
+                    if [[ "$dns_modified" == "true" ]]; then
+                      restore_dns_after_op
+                    fi
+                  fi
+                fi
+                
+                if [[ "$op_success" == "true" ]]; then
                   if signin_1password_cli; then
                     success "Basic configuration completed successfully!"
                     break
@@ -714,7 +802,29 @@ setup_1password_complete() {
                 fi
               else
                 echo "No default URL configured. Using standard op account add..."
-                if op account add; then
+                
+                local op_success=false
+                local dns_modified=false
+                
+                if op account add 2>/tmp/op_error.log; then
+                  op_success=true
+                else
+                  # Check for network/SSL errors and retry with DNS fix if needed
+                  if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                    warn "Network/SSL issue detected, trying with temporary DNS..."
+                    dns_modified=$(setup_temp_dns_for_op)
+                    
+                    if op account add; then
+                      op_success=true
+                    fi
+                    
+                    if [[ "$dns_modified" == "true" ]]; then
+                      restore_dns_after_op
+                    fi
+                  fi
+                fi
+                
+                if [[ "$op_success" == "true" ]]; then
                   if signin_1password_cli; then
                     success "Basic configuration completed successfully!"
                     break
@@ -777,12 +887,43 @@ setup_1password_complete() {
                 
                 # Try with environment variables that might help
                 echo "Debug: Trying with SSL/network environment variables..."
+                
+                # First attempt without DNS modification
+                local op_success=false
+                local dns_modified=false
+                
+                # Clear SSL environment that might interfere
                 export CURL_CA_BUNDLE=""
                 export SSL_CERT_DIR=""
                 export SSL_CERT_FILE=""
-                export OP_LOG_LEVEL="debug"
                 
-                if op account add --address "$address" --email "$email"; then
+                # Try with standard configuration first
+                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                  op_success=true
+                else
+                  # Check if it's a network/SSL error
+                  if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                    warn "Network/SSL issue detected, trying with temporary DNS configuration..."
+                    
+                    # Setup temporary DNS
+                    dns_modified=$(setup_temp_dns_for_op)
+                    
+                    # Retry with temporary DNS
+                    if op account add --address "$address" --email "$email"; then
+                      op_success=true
+                    fi
+                    
+                    # Restore DNS if we modified it
+                    if [[ "$dns_modified" == "true" ]]; then
+                      restore_dns_after_op
+                    fi
+                  else
+                    # Show the original error if not SSL related
+                    cat /tmp/op_error.log >&2
+                  fi
+                fi
+                
+                if [[ "$op_success" == "true" ]]; then
                   if signin_1password_cli; then
                     success "Basic manual configuration completed successfully!"
                     break
@@ -858,7 +999,33 @@ setup_1password_complete() {
               fi
             else
               info "No default URL configured, using standard op account add..."
-              if op account add; then
+              
+              # Try with DNS workaround if needed
+              local op_success=false
+              local dns_modified=false
+              
+              if op account add 2>/tmp/op_error.log; then
+                op_success=true
+              else
+                # Check for network/SSL errors and retry with DNS fix
+                if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
+                  warn "Network/SSL issue detected, trying with temporary DNS..."
+                  dns_modified=$(setup_temp_dns_for_op)
+                  
+                  if op account add; then
+                    op_success=true
+                  fi
+                  
+                  if [[ "$dns_modified" == "true" ]]; then
+                    restore_dns_after_op
+                  fi
+                else
+                  # Show the original error if not SSL related
+                  cat /tmp/op_error.log >&2
+                fi
+              fi
+              
+              if [[ "$op_success" == "true" ]]; then
                 if signin_1password_cli; then
                   success "Basic manual configuration completed successfully!"
                   break
