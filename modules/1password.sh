@@ -955,9 +955,9 @@ setup_1password_complete() {
                 echo "Using 1Password CLI: $(which op)"
                 echo "Version: $(op --version 2>/dev/null || echo 'unknown')"
                 
-                # Use timeout for safety, but with longer duration for user input
+                # Use timeout for safety - 15 seconds should be enough for connection
                 echo "⚠️  IMPORTANTE: O comando vai pedir seu Secret Key e Master Password"
-                echo "   Se demorar mais de 2 minutos, o comando será interrompido automaticamente"
+                echo "   Se demorar mais de 15 segundos, o comando será interrompido automaticamente"
                 echo "   Pressione Ctrl+C se quiser cancelar manualmente"
                 echo
                 
@@ -971,7 +971,7 @@ setup_1password_complete() {
                 echo "✅ 1Password CLI is responsive, proceeding with account setup..."
                 echo
                 
-                if timeout 120 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                if timeout 15 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                   info "Account added successfully, now signing in..."
                   
                   # Now try to sign in to the account
@@ -986,11 +986,11 @@ setup_1password_complete() {
                   local exit_code=$?
                   # Check if it's a timeout or other error
                   if [[ $exit_code -eq 124 ]]; then
-                    warn "Command timed out after 2 minutes"
+                    warn "Command timed out after 15 seconds"
                     echo "This usually means:"
-                    echo "  • The 1Password CLI is waiting for input but can't capture it"
-                    echo "  • There's a network connectivity issue"
-                    echo "  • The command is stuck waiting for user interaction"
+                    echo "  • Network connectivity issue (firewall, DNS, etc.)"
+                    echo "  • 1Password servers are unreachable"
+                    echo "  • Corporate network blocking the connection"
                     echo
                     echo "Try running the command manually in a new terminal:"
                     echo "  op account add --address '$address' --email '$email'"
@@ -1009,7 +1009,7 @@ setup_1password_complete() {
                       
                       # Retry with temporary DNS
                       echo "Retrying with alternative DNS configuration..."
-                      if timeout 120 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                      if timeout 15 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                         info "Account added with alternative DNS, now signing in..."
                         if eval "$(op signin --account "$address")"; then
                           op_success=true
