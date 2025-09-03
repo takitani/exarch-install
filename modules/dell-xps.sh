@@ -57,7 +57,8 @@ install_tlp_manual() {
   fi
   
   # Build and install
-  if make && sudo make install; then
+  if make; then
+    add_sudo_command "make install"
     success "TLP installed from source"
     popd > /dev/null
     rm -rf "$tmpdir_tlp"
@@ -98,7 +99,8 @@ install_tlp_rdw_manual() {
   # Install RDW
   pushd "rdw" > /dev/null || return 1
   
-  if make && sudo make install; then
+  if make; then
+    add_sudo_command "make install"
     success "TLP RDW installed from source"
     popd > /dev/null
     popd > /dev/null
@@ -231,7 +233,7 @@ install_ivsc_firmware_manual() {
   local firmware_dir="/usr/lib/firmware/vsc"
   
   # Create firmware directory
-  sudo mkdir -p "$firmware_dir"
+  add_sudo_command "mkdir -p $firmware_dir"
   
   # Download and extract firmware files
   local temp_repo
@@ -239,7 +241,7 @@ install_ivsc_firmware_manual() {
   
   if git clone https://github.com/intel/ivsc-firmware.git "$temp_repo" 2>/dev/null; then
     # Copy firmware files
-    find "$temp_repo" -name "*.bin" -exec sudo cp {} "$firmware_dir/" \;
+    add_sudo_command "find $temp_repo -name '*.bin' -exec cp {} $firmware_dir/ \\;"
     rm -rf "$temp_repo"
     return 0
   else
@@ -367,18 +369,14 @@ configure_dell_xps_kernel_modules() {
     for module in "${modules[@]}"; do
       echo "$module"
     done
-  } | sudo tee "$modules_file" > /dev/null
+  } | tee "$modules_file" > /dev/null
   
   info "Kernel modules configured: $modules_file"
   
   # Load modules immediately (if not in debug mode)
   for module in "${modules[@]}"; do
     if ! lsmod | grep -q "^$module "; then
-      if sudo modprobe "$module" 2>/dev/null; then
-        info "Loaded module: $module"
-      else
-        warn "Failed to load module: $module (may not be available yet)"
-      fi
+      add_sudo_command "modprobe $module"
     fi
   done
 }
@@ -407,7 +405,7 @@ install_dell_xps_power_management() {
       # Remove power-profiles-daemon if it conflicts with TLP
       if pacman -Q power-profiles-daemon >/dev/null 2>&1; then
         info "Removing power-profiles-daemon to resolve TLP conflict..."
-        sudo pacman -R power-profiles-daemon --noconfirm
+        add_sudo_command "pacman -R power-profiles-daemon --noconfirm"
       fi
       
       if pac tlp; then
@@ -475,7 +473,7 @@ install_dell_xps_power_management() {
       # Remove power-profiles-daemon if it conflicts with TLP RDW
       if pacman -Q power-profiles-daemon >/dev/null 2>&1; then
         info "Removing power-profiles-daemon to resolve TLP RDW conflict..."
-        sudo pacman -R power-profiles-daemon --noconfirm
+        add_sudo_command "pacman -R power-profiles-daemon --noconfirm"
       fi
       
       if pac tlp-rdw; then
@@ -623,11 +621,11 @@ install_dell_xps_power_management() {
       
       # Enable thermald service
       if systemctl list-unit-files | grep -q "thermald.service"; then
-        sudo systemctl enable thermald.service
+        add_sudo_command "systemctl enable thermald.service"
         
         # Start service if not running
         if ! systemctl is-active thermald >/dev/null 2>&1; then
-          sudo systemctl start thermald.service
+          add_sudo_command "systemctl start thermald.service"
         fi
       else
         warn "thermald service not found in systemd, manual start required"
@@ -652,33 +650,13 @@ install_dell_xps_power_management() {
       # Stop service first if it's running (to clear any errors)
       if systemctl is-active tlp >/dev/null 2>&1; then
         info "Stopping TLP service to clear any errors..."
-        sudo systemctl stop tlp.service
+        add_sudo_command "systemctl stop tlp.service"
         sleep 2
       fi
       
       # Enable service
-      if sudo systemctl enable tlp.service; then
-        success "TLP service enabled"
-        
-        # Start service with error checking
-        if sudo systemctl start tlp.service; then
-          success "TLP service started successfully"
-          
-          # Wait a moment and check status
-          sleep 3
-          if systemctl is-active tlp >/dev/null 2>&1; then
-            success "TLP service is running"
-          else
-            warn "TLP service failed to start properly"
-            systemctl status tlp.service --no-pager -l
-          fi
-        else
-          err "Failed to start TLP service"
-          systemctl status tlp.service --no-pager -l
-        fi
-      else
-        err "Failed to enable TLP service"
-      fi
+      add_sudo_command "systemctl enable tlp.service"
+      add_sudo_command "systemctl start tlp.service"
     else
       warn "TLP service not found in systemd, manual start required"
     fi
@@ -709,10 +687,10 @@ configure_tlp_dell_xps() {
   fi
   
   # Backup original config
-  sudo cp "$tlp_config" "${tlp_config}.backup.$(date +%Y%m%d_%H%M%S)"
+  add_sudo_command "cp $tlp_config ${tlp_config}.backup.$(date +%Y%m%d_%H%M%S)"
   
   # Apply Dell XPS specific optimizations
-  sudo tee -a "$tlp_config" > /dev/null << 'EOF'
+  add_sudo_command "tee -a $tlp_config > /dev/null << 'EOF'
 
 # Dell XPS 13 Plus optimizations added by Exarch Scripts
 # Battery optimization
@@ -767,7 +745,7 @@ setup_dual_keyboard_dell_xps() {
   local config_dir="/etc/X11/xorg.conf.d"
   if [[ ! -d "$config_dir" ]]; then
     info "Creating X11 configuration directory: $config_dir"
-    sudo mkdir -p "$config_dir"
+    add_sudo_command "mkdir -p $config_dir"
   fi
   
   if is_debug_mode; then
@@ -776,7 +754,7 @@ setup_dual_keyboard_dell_xps() {
   fi
   
   # Create keyboard configuration
-  sudo tee "$keyboard_config" > /dev/null << 'EOF'
+  add_sudo_command "tee $keyboard_config > /dev/null << 'EOF'
 # Keyboard configuration for Dell XPS - BR + US International
 Section "InputClass"
     Identifier "system-keyboard"
@@ -861,10 +839,10 @@ install_dell_utilities() {
       
       # Enable fwupd service
       if systemctl list-unit-files | grep -q "fwupd.service"; then
-        sudo systemctl enable fwupd.service
+        add_sudo_command "systemctl enable fwupd.service"
         
         if ! systemctl is-active fwupd >/dev/null 2>&1; then
-          sudo systemctl start fwupd.service
+          add_sudo_command "systemctl start fwupd.service"
         fi
       else
         warn "fwupd service not found in systemd, manual start required"
@@ -898,10 +876,10 @@ create_dell_xps_shutdown_hook() {
   fi
   
   # Create shutdown directory if it doesn't exist
-  sudo mkdir -p "/etc/systemd/system-shutdown"
+  add_sudo_command "mkdir -p /etc/systemd/system-shutdown"
   
   # Create shutdown hook script
-  sudo tee "$hook_file" > /dev/null << 'EOF'
+  add_sudo_command "tee $hook_file > /dev/null << 'EOF'
 #!/bin/bash
 # Dell XPS shutdown cleanup hook
 # Prevents shutdown hangs by properly stopping services and unloading modules
@@ -946,7 +924,7 @@ exit 0
 EOF
 
   # Make executable
-  sudo chmod +x "$hook_file"
+  add_sudo_command "chmod +x $hook_file"
   
   success "Dell XPS shutdown hook created: $hook_file"
   info "This hook will run during shutdown to prevent hanging"
@@ -1005,8 +983,8 @@ WantedBy=multi-user.target
 EOF
 
   # Enable the service
-  sudo systemctl daemon-reload
-  sudo systemctl enable dell-xps-shutdown.service
+  add_sudo_command "systemctl daemon-reload"
+  add_sudo_command "systemctl enable dell-xps-shutdown.service"
   
   success "Dell XPS graceful shutdown service created and enabled"
   
@@ -1031,7 +1009,7 @@ configure_dell_xps_kernel_params() {
   fi
   
   # Backup GRUB config
-  sudo cp "$grub_config" "$backup_file"
+  add_sudo_command "cp $grub_config $backup_file"
   info "GRUB config backed up to: $backup_file"
   
   # Kernel parameters to add
@@ -1046,16 +1024,16 @@ configure_dell_xps_kernel_params() {
   # Add parameters to GRUB_CMDLINE_LINUX_DEFAULT
   if grep -q "^GRUB_CMDLINE_LINUX_DEFAULT=" "$grub_config"; then
     # Replace existing line
-    sudo sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 $kernel_params\"/" "$grub_config"
+    add_sudo_command "sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=\"\\(.*\\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\\1 $kernel_params\"/' $grub_config"
   else
     # Add new line
-    echo "GRUB_CMDLINE_LINUX_DEFAULT=\"$kernel_params\"" | sudo tee -a "$grub_config" > /dev/null
+    add_sudo_command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"$kernel_params\"' >> $grub_config"
   fi
   
   # Update GRUB
   info "Updating GRUB configuration..."
   if command -v grub-mkconfig >/dev/null 2>&1; then
-    sudo grub-mkconfig -o /boot/grub/grub.cfg
+    add_sudo_command "grub-mkconfig -o /boot/grub/grub.cfg"
     success "GRUB configuration updated"
   else
     warn "grub-mkconfig not found, please update GRUB manually"
@@ -1195,7 +1173,7 @@ create_tlp_service() {
   local service_file="/etc/systemd/system/tlp.service"
   
   # Create service file
-  sudo tee "$service_file" > /dev/null << 'EOF'
+  add_sudo_command "tee $service_file > /dev/null << 'EOF'
 [Unit]
 Description=TLP - Linux Advanced Power Management
 Documentation=https://linrunner.de/tlp/
@@ -1211,9 +1189,10 @@ TimeoutSec=0
 [Install]
 WantedBy=multi-user.target
 EOF
+'
 
   # Reload systemd
-  sudo systemctl daemon-reload
+  add_sudo_command "systemctl daemon-reload"
   
   if [[ -f "$service_file" ]]; then
     success "TLP service created: $service_file"
@@ -1231,7 +1210,7 @@ create_thermald_service() {
   local service_file="/etc/systemd/system/thermald.service"
   
   # Create service file
-  sudo tee "$service_file" > /dev/null << 'EOF'
+  add_sudo_command "tee $service_file > /dev/null << 'EOF'
 [Unit]
 Description=Thermal Daemon Service
 Documentation=https://github.com/intel/thermal_daemon
@@ -1246,9 +1225,10 @@ RestartSec=1
 [Install]
 WantedBy=multi-user.target
 EOF
+'
 
   # Reload systemd
-  sudo systemctl daemon-reload
+  add_sudo_command "systemctl daemon-reload"
   
   if [[ -f "$service_file" ]]; then
     success "thermald service created: $service_file"
@@ -1266,7 +1246,7 @@ create_fwupd_service() {
   local service_file="/etc/systemd/system/fwupd.service"
   
   # Create service file
-  sudo tee "$service_file" > /dev/null << 'EOF'
+  add_sudo_command "tee $service_file > /dev/null << 'EOF'
 [Unit]
 Description=Firmware update daemon
 Documentation=man:fwupd(8)
@@ -1281,9 +1261,10 @@ RestartSec=1
 [Install]
 WantedBy=multi-user.target
 EOF
+'
 
   # Reload systemd
-  sudo systemctl daemon-reload
+  add_sudo_command "systemctl daemon-reload"
   
   if [[ -f "$service_file" ]]; then
     success "fwupd service created: $service_file"
@@ -1367,17 +1348,17 @@ cleanup_dell_xps_services() {
   # Stop TLP services
   if systemctl is-active tlp >/dev/null 2>&1; then
     info "Stopping TLP service..."
-    sudo systemctl stop tlp
+    add_sudo_command "systemctl stop tlp"
   fi
   
   if systemctl is-active thermald >/dev/null 2>&1; then
     info "Stopping thermald service..."
-    sudo systemctl stop thermald
+    add_sudo_command "systemctl stop thermald"
   fi
   
   if systemctl is-active fwupd >/dev/null 2>&1; then
     info "Stopping fwupd service..."
-    sudo systemctl stop fwupd
+    add_sudo_command "systemctl stop fwupd"
   fi
   
   # Unload IPU6 modules if loaded
@@ -1385,7 +1366,7 @@ cleanup_dell_xps_services() {
   for module in "${modules[@]}"; do
     if lsmod | grep -q "^$module "; then
       info "Unloading module: $module"
-      sudo modprobe -r "$module" 2>/dev/null || warn "Failed to unload $module"
+      add_sudo_command "modprobe -r $module"
     fi
   done
   
@@ -1396,15 +1377,15 @@ cleanup_dell_xps_services() {
     pids=$(pgrep "$proc" 2>/dev/null)
     if [[ -n "$pids" ]]; then
       info "Terminating $proc processes: $pids"
-      echo "$pids" | xargs -r sudo kill -TERM 2>/dev/null
+      add_sudo_command "echo '$pids' | xargs -r kill -TERM"
       sleep 1
-      echo "$pids" | xargs -r sudo kill -KILL 2>/dev/null
+      add_sudo_command "echo '$pids' | xargs -r kill -KILL"
     fi
   done
   
   # Sync filesystems
   info "Syncing filesystems..."
-  sudo sync
+  add_sudo_command "sync"
   
   success "Cleanup completed - safe to reboot"
 }
