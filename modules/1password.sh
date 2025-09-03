@@ -939,7 +939,24 @@ setup_1password_complete() {
                 echo
                 
                 # First try to add the account (this should be quick)
-                if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                echo "Starting 1Password account setup..."
+                echo "This may take a moment while 1Password CLI connects..."
+                
+                # Check if op command is available
+                if ! command -v op >/dev/null 2>&1; then
+                  err "1Password CLI (op) not found in PATH"
+                  echo "Current PATH: $PATH"
+                  echo "Please install 1Password CLI first:"
+                  echo "  yay -S 1password-cli"
+                  echo "  or download from: https://1password.com/downloads/command-line/"
+                  return 1
+                fi
+                
+                echo "Using 1Password CLI: $(which op)"
+                echo "Version: $(op --version 2>/dev/null || echo 'unknown')"
+                
+                # Don't use timeout for interactive commands - let user input
+                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                   info "Account added successfully, now signing in..."
                   
                   # Now try to sign in to the account
@@ -969,7 +986,7 @@ setup_1password_complete() {
                       
                       # Retry with temporary DNS
                       echo "Retrying with alternative DNS configuration..."
-                      if timeout 30 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                      if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                         info "Account added with alternative DNS, now signing in..."
                         if eval "$(op signin --account "$address")"; then
                           op_success=true
@@ -1031,7 +1048,8 @@ setup_1password_complete() {
                     for helper_path in "${helper_paths[@]}"; do
                       if [[ -x "$helper_path" ]]; then
                         info "Running interactive helper: $helper_path"
-                        if "$helper_path"; then
+                        # Execute helper with proper environment
+                        if bash -c "source '$helper_path'"; then
                           success "Interactive helper completed successfully!"
                           return 0
                         else

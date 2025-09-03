@@ -81,8 +81,8 @@ configure_cli_method() {
     echo "Configuração via 1Password CLI"
     echo
     echo "Você precisa de um dos seguintes:"
-    echo "• ${BOLD}Emergency Kit${NC} com Setup Code (começa com A3-)"
-    echo "• ${BOLD}Dados da conta${NC}: URL, email e Secret Key"
+                echo "• Emergency Kit com Setup Code (começa com A3-)"
+            echo "• Dados da conta: URL, email e Secret Key"
     echo
     echo "O que você tem?"
     echo "1) Setup Code do Emergency Kit"
@@ -315,17 +315,17 @@ if detect_1password_app; then
     echo
     echo "Você tem três opções:"
     echo
-    echo "1) ${BOLD}Configurar via CLI${NC} (recomendado para scripts)"
+    echo "1) Configurar via CLI (recomendado para scripts)"
     echo "   • Configuração direta no terminal"
     echo "   • Melhor para automação"
     echo "   • Precisa do Emergency Kit ou dados da conta"
     echo
-    echo "2) ${BOLD}Usar integração com o app${NC} (mais fácil)"
+    echo "2) Usar integração com o app (mais fácil)"
     echo "   • Abre o 1Password desktop"
     echo "   • Ativa a integração com CLI"
     echo "   • Não precisa digitar senhas no terminal"
     echo
-    echo "3) ${BOLD}Configurar manualmente${NC}"
+    echo "3) Configurar manualmente"
     echo "   • Adiciona conta via terminal (método antigo)"
     echo "   • Precisa do Emergency Kit"
     echo
@@ -356,10 +356,10 @@ if detect_1password_app; then
         echo "No 1Password desktop:"
         echo
         echo "1. Faça login na sua conta"
-        echo "2. Vá em ${BOLD}Settings${NC} (ou Preferences)"
-        echo "3. Clique em ${BOLD}Developer${NC}"
-        echo "4. Ative ${BOLD}'Integrate with 1Password CLI'${NC}"
-        echo "5. ${BOLD}Autorize${NC} quando solicitado"
+        echo "2. Vá em Settings (ou Preferences)"
+        echo "3. Clique em Developer"
+        echo "4. Ative 'Integrate with 1Password CLI'"
+        echo "5. Autorize quando solicitado"
         echo
         echo "Pressione ENTER quando terminar..."
         read -r

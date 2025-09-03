@@ -42,6 +42,17 @@ bootstrap_remote() {
   echo -e "${GREEN}[SUCCESS]${NC} Repository downloaded, executing script..."
   echo
   
+  # Set proper environment variables
+  export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+  export HOME="$HOME"
+  export USER="$USER"
+  
+  echo -e "${BLUE}[INFO]${NC} Environment configured:"
+  echo "  PATH: $PATH"
+  echo "  HOME: $HOME"
+  echo "  USER: $USER"
+  echo
+  
   # Execute with all original arguments
   exec ./install.sh "$@"
 }
@@ -51,7 +62,13 @@ bootstrap_remote() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # If we're in /dev/fd or missing core files, we're running remotely
-if [[ "$SCRIPT_DIR" == "/dev/fd" ]] || [[ ! -f "$SCRIPT_DIR/lib/core.sh" ]]; then
+if [[ "$SCRIPT_DIR" == "/dev/fd" ]] || [[ "$SCRIPT_DIR" == "/proc/self/fd" ]] || [[ ! -f "$SCRIPT_DIR/lib/core.sh" ]]; then
+  echo "🔍 Detected remote execution environment"
+  echo "Script directory: $SCRIPT_DIR"
+  echo "Current working directory: $(pwd)"
+  echo "User: $(whoami)"
+  echo "PATH: $PATH"
+  echo
   bootstrap_remote "$@"
   exit $?
 fi
