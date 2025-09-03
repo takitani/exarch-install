@@ -955,8 +955,23 @@ setup_1password_complete() {
                 echo "Using 1Password CLI: $(which op)"
                 echo "Version: $(op --version 2>/dev/null || echo 'unknown')"
                 
-                # Don't use timeout for interactive commands - let user input
-                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                # Use timeout for safety, but with longer duration for user input
+                echo "⚠️  IMPORTANTE: O comando vai pedir seu Secret Key e Master Password"
+                echo "   Se demorar mais de 2 minutos, o comando será interrompido automaticamente"
+                echo "   Pressione Ctrl+C se quiser cancelar manualmente"
+                echo
+                
+                # Test if the command can actually connect before proceeding
+                echo "Testing connection to 1Password servers..."
+                if ! timeout 10 op --version >/dev/null 2>&1; then
+                  err "1Password CLI is not responding. Please check if it's properly installed."
+                  return 1
+                fi
+                
+                echo "✅ 1Password CLI is responsive, proceeding with account setup..."
+                echo
+                
+                if timeout 120 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                   info "Account added successfully, now signing in..."
                   
                   # Now try to sign in to the account
@@ -971,7 +986,15 @@ setup_1password_complete() {
                   local exit_code=$?
                   # Check if it's a timeout or other error
                   if [[ $exit_code -eq 124 ]]; then
-                    warn "Command timed out after 30 seconds"
+                    warn "Command timed out after 2 minutes"
+                    echo "This usually means:"
+                    echo "  • The 1Password CLI is waiting for input but can't capture it"
+                    echo "  • There's a network connectivity issue"
+                    echo "  • The command is stuck waiting for user interaction"
+                    echo
+                    echo "Try running the command manually in a new terminal:"
+                    echo "  op account add --address '$address' --email '$email'"
+                    echo
                   else
                     # Show the actual error
                     cat /tmp/op_error.log >&2
@@ -986,7 +1009,7 @@ setup_1password_complete() {
                       
                       # Retry with temporary DNS
                       echo "Retrying with alternative DNS configuration..."
-                      if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                      if timeout 120 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
                         info "Account added with alternative DNS, now signing in..."
                         if eval "$(op signin --account "$address")"; then
                           op_success=true
