@@ -871,8 +871,8 @@ toggle_option() {
     22) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
     23) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
     24) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    25) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
-    26) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
+    25) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
+    26) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
     27) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
     28) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
     29) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
@@ -894,6 +894,9 @@ toggle_option() {
     100) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
     101) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
 
+    81) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
+    82) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
+    
     101) SETUP_DELL_XPS_WEBCAM=$([ "$SETUP_DELL_XPS_WEBCAM" == true ] && echo false || echo true) ;;
     102) SETUP_DELL_XPS_POWER=$([ "$SETUP_DELL_XPS_POWER" == true ] && echo false || echo true) ;;
     103) SETUP_DELL_XPS_KEYBOARD=$([ "$SETUP_DELL_XPS_KEYBOARD" == true ] && echo false || echo true) ;;
