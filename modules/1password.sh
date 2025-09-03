@@ -901,27 +901,10 @@ setup_1password_complete() {
               fi
               
               if [[ -n "$email" ]]; then
-                echo "Debug: About to run: op account add --address '$address' --email '$email'"
-                echo "Debug: Testing connectivity to $address..."
-                
-                # Test HTTPS connectivity 
-                if curl -I -s --connect-timeout 10 "https://$address" >/dev/null 2>&1; then
-                  info "✅ Connectivity to $address OK"
-                else
-                  warn "⚠️ Connectivity test to $address failed - but will try anyway"
+                # Quick connectivity test without all the debug noise
+                if ! curl -I -s --connect-timeout 5 "https://$address" >/dev/null 2>&1; then
+                  warn "⚠️ Connectivity test to $address failed - will try anyway"
                 fi
-                
-                # Additional debugging - test what op can see
-                echo "Debug: Testing op CLI connectivity..."
-                echo "Debug: op version: $(op --version 2>/dev/null || echo 'version check failed')"
-                echo "Debug: DNS resolution test:"
-                nslookup "$address" 2>/dev/null | grep -A2 "Name:" | head -3 || echo "nslookup failed"
-                
-                # Test with verbose op command
-                echo "Debug: Running op with detailed error output..."
-                
-                # Try with environment variables that might help
-                echo "Debug: Trying with SSL/network environment variables..."
                 
                 # First attempt without DNS modification
                 local op_success=false
@@ -931,12 +914,6 @@ setup_1password_complete() {
                 export CURL_CA_BUNDLE=""
                 export SSL_CERT_DIR=""
                 export SSL_CERT_FILE=""
-                
-                # Try adding account first, then sign in separately
-                echo "Adding 1Password account..."
-                echo "You will need your Secret Key and Master Password"
-                echo "Secret Key format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
-                echo
                 
                 # First try to add the account (this should be quick)
                 echo "Starting 1Password account setup..."
@@ -952,18 +929,25 @@ setup_1password_complete() {
                   return 1
                 fi
                 
-                echo "Using 1Password CLI: $(which op)"
-                echo "Version: $(op --version 2>/dev/null || echo 'unknown')"
+                # Show op version briefly
+                info "1Password CLI version: $(op --version 2>/dev/null || echo 'unknown')"
                 
-                # Use timeout for safety - 15 seconds should be enough for connection
-                echo "⚠️  IMPORTANTE: O comando vai pedir seu Secret Key e Master Password"
-                echo "   Se demorar mais de 15 segundos, o comando será interrompido automaticamente"
-                echo "   Pressione Ctrl+C se quiser cancelar manualmente"
+                # Important: op account add needs interactive input, don't use timeout on it
                 echo
+                echo "═════════════════════════════════════════════════════════════"
+                echo "⚠️  IMPORTANTE: The next step requires your interaction!"
+                echo "═════════════════════════════════════════════════════════════"
+                echo 
+                echo "You will need to enter:"
+                echo "  1. Your Secret Key (format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX)"
+                echo "  2. Your Master Password"
+                echo
+                echo "Press Enter to continue when ready (or Ctrl+C to cancel)..."
+                read -r
                 
                 # Test if the command can actually connect before proceeding
                 echo "Testing connection to 1Password servers..."
-                if ! timeout 10 op --version >/dev/null 2>&1; then
+                if ! timeout 5 op --version >/dev/null 2>&1; then
                   err "1Password CLI is not responding. Please check if it's properly installed."
                   return 1
                 fi
@@ -971,7 +955,12 @@ setup_1password_complete() {
                 echo "✅ 1Password CLI is responsive, proceeding with account setup..."
                 echo
                 
-                if timeout 15 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                # Don't use timeout here - the user needs time to enter credentials
+                echo "Starting 1Password account setup (no timeout - take your time)..."
+                
+                # IMPORTANT: Don't redirect stderr when interactive input is needed!
+                # The op command uses stderr for password prompts
+                if op account add --address "$address" --email "$email"; then
                   info "Account added successfully, now signing in..."
                   
                   # Now try to sign in to the account
@@ -984,32 +973,27 @@ setup_1password_complete() {
                   fi
                 else
                   local exit_code=$?
-                  # Check if it's a timeout or other error
-                  if [[ $exit_code -eq 124 ]]; then
-                    warn "Command timed out after 15 seconds"
-                    echo "This usually means:"
-                    echo "  • Network connectivity issue (firewall, DNS, etc.)"
-                    echo "  • 1Password servers are unreachable"
-                    echo "  • Corporate network blocking the connection"
+                  # Check the exit code
+                  if [[ $exit_code -eq 130 ]]; then
+                    warn "Operation cancelled by user (Ctrl+C)"
                     echo
-                    echo "Try running the command manually in a new terminal:"
-                    echo "  op account add --address '$address' --email '$email'"
-                    echo
-                  else
-                    # Show the actual error
-                    cat /tmp/op_error.log >&2
+                  elif [[ $exit_code -ne 0 ]]; then
+                    # Error was already shown to user (not redirected)
                     
-                    # Check for specific issues
-                    if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
-                      warn "Network/SSL issue detected, trying with temporary DNS configuration..."
+                    # Since we're not redirecting stderr anymore, we can't check the error file
+                    # Instead, just offer to retry with DNS modification
+                    if ask_yes_no "Would you like to retry with alternative DNS settings?"; then
+                      warn "Trying with temporary DNS configuration..."
                       
-                      # Setup temporary DNS with timeout
-                      echo "Setting up temporary DNS (this may take a few seconds)..."
-                      dns_modified=$(timeout 15 setup_temp_dns_for_op)
+                      # Setup temporary DNS
+                      echo "Setting up temporary DNS..."
+                      dns_modified=$(setup_temp_dns_for_op)
                       
                       # Retry with temporary DNS
                       echo "Retrying with alternative DNS configuration..."
-                      if timeout 15 op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                      echo "You will need to enter your Secret Key and Master Password again."
+                      # Don't redirect stderr for interactive input
+                      if op account add --address "$address" --email "$email"; then
                         info "Account added with alternative DNS, now signing in..."
                         if eval "$(op signin --account "$address")"; then
                           op_success=true
