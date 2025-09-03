@@ -1011,7 +1011,6 @@ KillMode=none
 [Install]
 WantedBy=multi-user.target
 EOF
-"
 
   # Enable the service
   add_sudo_command "systemctl daemon-reload"
