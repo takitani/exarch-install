@@ -384,7 +384,7 @@ configure_1password_cli_direct() {
         local op_success=false
         local dns_modified=false
         
-        if op account add --address "${clean_url}" --email "${email}" 2>/tmp/op_error.log; then
+        if timeout 30 op account add --address "${clean_url}" --email "${email}" </dev/null 2>/tmp/op_error.log; then
           op_success=true
         else
           # Check for network/SSL errors and retry with DNS fix if needed
@@ -392,7 +392,7 @@ configure_1password_cli_direct() {
             warn "Network/SSL issue detected, trying with temporary DNS..."
             dns_modified=$(setup_temp_dns_for_op)
             
-            if op account add --address "${clean_url}" --email "${email}"; then
+            if timeout 30 op account add --address "${clean_url}" --email "${email}" </dev/null; then
               op_success=true
             fi
             
@@ -412,7 +412,7 @@ configure_1password_cli_direct() {
         fi
       else
         echo "Enter your 1Password account URL when prompted (e.g. company.1password.com)"
-        if op account add; then
+        if timeout 30 op account add </dev/null; then
           success "Account added via Setup Code!"
           return 0
         else
@@ -471,7 +471,7 @@ configure_1password_cli_direct() {
       local op_success=false
       local dns_modified=false
       
-      if op account add --address "$url" --email "$email" --secret-key "$secret_key" 2>/tmp/op_error.log; then
+      if timeout 30 op account add --address "$url" --email "$email" --secret-key "$secret_key" </dev/null 2>/tmp/op_error.log; then
         op_success=true
       else
         # Check for network/SSL errors and retry with DNS fix if needed
@@ -479,7 +479,7 @@ configure_1password_cli_direct() {
           warn "Network/SSL issue detected, trying with temporary DNS..."
           dns_modified=$(setup_temp_dns_for_op)
           
-          if op account add --address "$url" --email "$email" --secret-key "$secret_key"; then
+          if timeout 30 op account add --address "$url" --email "$email" --secret-key "$secret_key" </dev/null; then
             op_success=true
           fi
           
@@ -766,7 +766,7 @@ setup_1password_complete() {
                 local op_success=false
                 local dns_modified=false
                 
-                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                if timeout 30 op account add --address "$address" --email "$email" </dev/null 2>/tmp/op_error.log; then
                   op_success=true
                 else
                   # Check for network/SSL errors and retry with DNS fix if needed
@@ -774,7 +774,7 @@ setup_1password_complete() {
                     warn "Network/SSL issue detected, trying with temporary DNS..."
                     dns_modified=$(setup_temp_dns_for_op)
                     
-                    if op account add --address "$address" --email "$email"; then
+                    if timeout 30 op account add --address "$address" --email "$email" </dev/null; then
                       op_success=true
                     fi
                     
@@ -806,7 +806,7 @@ setup_1password_complete() {
                 local op_success=false
                 local dns_modified=false
                 
-                if op account add 2>/tmp/op_error.log; then
+                if timeout 30 op account add </dev/null 2>/tmp/op_error.log; then
                   op_success=true
                 else
                   # Check for network/SSL errors and retry with DNS fix if needed
@@ -814,7 +814,7 @@ setup_1password_complete() {
                     warn "Network/SSL issue detected, trying with temporary DNS..."
                     dns_modified=$(setup_temp_dns_for_op)
                     
-                    if op account add; then
+                    if timeout 30 op account add </dev/null; then
                       op_success=true
                     fi
                     
@@ -897,19 +897,27 @@ setup_1password_complete() {
                 export SSL_CERT_DIR=""
                 export SSL_CERT_FILE=""
                 
-                # Try with standard configuration first
-                if op account add --address "$address" --email "$email" 2>/tmp/op_error.log; then
+                # Try with standard configuration first (with --signin flag for immediate authentication)
+                echo "When prompted, enter your 1Password Master Password and Secret Key"
+                echo "Secret Key format: A3-XXXXXX-XXXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                echo
+                
+                if eval "$(timeout --foreground 90 op account add --address "$address" --email "$email" --signin 2>/tmp/op_error.log)"; then
                   op_success=true
                 else
-                  # Check if it's a network/SSL error
-                  if grep -qi "couldn't connect\|ssl\|tls\|certificate" /tmp/op_error.log 2>/dev/null; then
-                    warn "Network/SSL issue detected, trying with temporary DNS configuration..."
+                  local exit_code=$?
+                  # Check if it's a timeout or other error
+                  if [[ $exit_code -eq 124 ]]; then
+                    warn "Command timed out after 90 seconds"
+                  elif grep -qi "couldn't connect\|ssl\|tls\|certificate\|missing OP_SECRET_KEY" /tmp/op_error.log 2>/dev/null; then
+                    warn "Network/SSL issue detected or authentication failed"
                     
                     # Setup temporary DNS
                     dns_modified=$(setup_temp_dns_for_op)
                     
                     # Retry with temporary DNS
-                    if op account add --address "$address" --email "$email"; then
+                    echo "Retrying with alternative DNS configuration..."
+                    if eval "$(timeout --foreground 90 op account add --address "$address" --email "$email" --signin 2>/tmp/op_error.log)"; then
                       op_success=true
                     fi
                     
@@ -1004,7 +1012,7 @@ setup_1password_complete() {
               local op_success=false
               local dns_modified=false
               
-              if op account add 2>/tmp/op_error.log; then
+              if timeout 30 op account add </dev/null 2>/tmp/op_error.log; then
                 op_success=true
               else
                 # Check for network/SSL errors and retry with DNS fix
@@ -1012,7 +1020,7 @@ setup_1password_complete() {
                   warn "Network/SSL issue detected, trying with temporary DNS..."
                   dns_modified=$(setup_temp_dns_for_op)
                   
-                  if op account add; then
+                  if timeout 30 op account add </dev/null; then
                     op_success=true
                   fi
                   
