@@ -114,7 +114,9 @@ show_menu() {
     "INSTALL_COPYQ:CopyQ clipboard manager" \
     "INSTALL_DROPBOX:Dropbox" \
     "INSTALL_AWS_VPN:AWS VPN Client" \
-    "INSTALL_ESPANSO:Espanso text expander"
+    "INSTALL_ESPANSO:Espanso text expander" \
+    "INSTALL_1PASSWORD:1Password desktop app" \
+    "INSTALL_1PASSWORD_CLI:1Password CLI"
     
   show_menu_category "Development Tools" "30" \
     "INSTALL_POSTMAN:Postman API client" \
@@ -850,38 +852,48 @@ toggle_option() {
     2) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
     3) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
     4) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
-    5) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
-    6) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
-    7) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
-    8) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
-    9) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
-    11) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
-    12) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
-    13) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
-    14) INSTALL_JB_RIDER=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
-    15) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
-    16) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    17) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
-    18) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
-    19) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    21) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    22) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
-    23) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    24) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
-    25) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
-    26) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    27) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
-    28) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    29) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    5) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
+    6) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
+    7) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
+    8) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
+    9) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
+    10) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
+    11) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
+    12) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
+    13) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    14) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
+    16) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
+    17) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
+    18) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    19) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    20) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
+    21) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    22) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    23) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    24) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
+    25) INSTALL_WINDOWS_DOCKER=$([ "$INSTALL_WINDOWS_DOCKER" == true ] && echo false || echo true) ;;
+    26) INSTALL_WINAPPS_LAUNCHER=$([ "$INSTALL_WINAPPS_LAUNCHER" == true ] && echo false || echo true) ;;
+    27) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    28) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    29) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    30) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
     31) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
     32) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
     33) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
-    34) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
-    35) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
-    36) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
-    37) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
-    38) SETUP_DELL_XPS_9320=$([ "$SETUP_DELL_XPS_9320" == true ] && echo false || echo true) ;;
-    39) SETUP_DUAL_KEYBOARD=$([ "$SETUP_DUAL_KEYBOARD" == true ] && echo false || echo true) ;;
+    
+    # System Configuration options (90+)
+    91) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
+    92) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
+    93) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
+    94) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
+    95) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
+    96) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
+    97) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    98) GENERATE_REMMINA_CONNECTIONS=$([ "$GENERATE_REMMINA_CONNECTIONS" == true ] && echo false || echo true) ;;
+    99) FIX_CURSOR_INPUT_METHOD=$([ "$FIX_CURSOR_INPUT_METHOD" == true ] && echo false || echo true) ;;
+    100) SETUP_GNOME_KEYRING=$([ "$SETUP_GNOME_KEYRING" == true ] && echo false || echo true) ;;
+    101) SETUP_PTBR_KEYBOARD_LAYOUT=$([ "$SETUP_PTBR_KEYBOARD_LAYOUT" == true ] && echo false || echo true) ;;
+
     101) SETUP_DELL_XPS_WEBCAM=$([ "$SETUP_DELL_XPS_WEBCAM" == true ] && echo false || echo true) ;;
     102) SETUP_DELL_XPS_POWER=$([ "$SETUP_DELL_XPS_POWER" == true ] && echo false || echo true) ;;
     103) SETUP_DELL_XPS_KEYBOARD=$([ "$SETUP_DELL_XPS_KEYBOARD" == true ] && echo false || echo true) ;;
