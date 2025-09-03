@@ -486,6 +486,44 @@ setup_1password_complete() {
   
   info "1Password integration required for selected features..."
   
+  # Ask user if they really want to use 1Password features
+  echo
+  echo "The following 1Password features are enabled:"
+  [[ "${SETUP_DEV_PGPASS:-false}" == "true" ]] && echo "  • .pgpass generation for PostgreSQL connections"
+  [[ "${SETUP_SSH_KEYS:-false}" == "true" ]] && echo "  • SSH key management and synchronization"
+  [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]] && echo "  • Remmina RDP connection generation"
+  echo
+  if ! ask_yes_no "Do you want to proceed with 1Password setup for these features?"; then
+    info "User chose not to use 1Password features"
+    echo
+    echo "Options:"
+    echo "1) Disable all 1Password features and continue"
+    echo "2) Return to menu to change selection"
+    echo
+    echo -n "Choose (1/2): "
+    read -r disable_choice
+    
+    case "$disable_choice" in
+      1)
+        info "Disabling 1Password features..."
+        export SETUP_DEV_PGPASS=false
+        export SETUP_SSH_KEYS=false
+        export SETUP_REMMINA_CONNECTIONS=false
+        return 0
+        ;;
+      2)
+        return 2  # Special return code to return to menu
+        ;;
+      *)
+        err "Invalid choice, disabling 1Password features by default"
+        export SETUP_DEV_PGPASS=false
+        export SETUP_SSH_KEYS=false
+        export SETUP_REMMINA_CONNECTIONS=false
+        return 0
+        ;;
+    esac
+  fi
+  
   # Install dependencies
   if ! command_exists jq; then
     info "Installing jq (required for JSON processing)..."

@@ -1265,14 +1265,22 @@ execute_installation_modules() {
   # 1Password integration
   if module_enabled "1password"; then
     if command -v setup_1password_complete >/dev/null 2>&1; then
+      local op_result
       if ! setup_1password_complete; then
-        warn "1Password configuration failed or was skipped"
-        echo
-        if ask_yes_no "Do you want to continue without 1Password integration?"; then
-          info "Continuing without 1Password..."
+        op_result=$?
+        if [[ $op_result -eq 2 ]]; then
+          # User wants to return to menu
+          warn "1Password configuration cancelled, returning to menu"
+          return 2
         else
-          err "Installation aborted due to 1Password configuration failure"
-          exit 1
+          warn "1Password configuration failed or was skipped"
+          echo
+          if ask_yes_no "Do you want to continue without 1Password integration?"; then
+            info "Continuing without 1Password..."
+          else
+            err "Installation aborted due to 1Password configuration failure"
+            exit 1
+          fi
         fi
       fi
     else
@@ -1284,10 +1292,17 @@ execute_installation_modules() {
   
   # SSH keys from 1Password
   if [[ "${SETUP_SSH_KEYS:-false}" == "true" ]]; then
-    if command -v setup_ssh_keys_from_1password >/dev/null 2>&1; then
-      setup_ssh_keys_from_1password || warn "SSH key setup failed or was skipped"
+    # Only setup SSH keys if 1Password is configured and authenticated
+    if command_exists op && op account list >/dev/null 2>&1 && ! op account list 2>&1 | grep -q "No accounts configured"; then
+      if command -v setup_ssh_keys_from_1password >/dev/null 2>&1; then
+        setup_ssh_keys_from_1password || warn "SSH key setup failed or was skipped"
+      else
+        warn "SSH key function not available. Skipping SSH key configuration."
+      fi
     else
-      warn "SSH key function not available. Skipping SSH key configuration."
+      info "1Password not configured, skipping SSH key setup"
+      echo "Configure 1Password first, then run: ./install.sh --1pass"
+      echo "Or use the helper: ./helpers/1password-helper.sh"
     fi
   fi
   
@@ -1296,7 +1311,7 @@ execute_installation_modules() {
     # Check if 1Password CLI is available and configured
     if command_exists op; then
       # Test if 1Password is actually authenticated
-      if timeout 5 op account list >/dev/null 2>&1 && timeout 5 op vault list >/dev/null 2>&1; then
+      if timeout 5 op account list >/dev/null 2>&1 && timeout 5 op vault list >/dev/null 2>&1 && ! op account list 2>&1 | grep -q "No accounts configured"; then
         if command -v setup_remmina_connections_complete >/dev/null 2>&1; then
           if ! setup_remmina_connections_complete; then
             warn "Remmina configuration failed"
@@ -1402,7 +1417,7 @@ module_enabled() {
       [[ "${ENABLE_DEVELOPMENT_MODULE:-true}" == "true" ]]
       ;;
     "1password")
-      [[ "${ENABLE_1PASSWORD_MODULE:-true}" == "true" ]] && [[ "${SETUP_DEV_PGPASS:-false}" == "true" ]]
+      [[ "${ENABLE_1PASSWORD_MODULE:-true}" == "true" ]] && ([[ "${SETUP_DEV_PGPASS:-false}" == "true" ]] || [[ "${SETUP_SSH_KEYS:-false}" == "true" ]] || [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]])
       ;;
     "remmina")
       [[ "${ENABLE_REMMINA_MODULE:-true}" == "true" ]] && [[ "${SETUP_REMMINA_CONNECTIONS:-false}" == "true" ]]
