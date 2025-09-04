@@ -139,7 +139,7 @@ setup_dell_xps_9320_webcam() {
   install_ipu6_drivers
   
   # Step 5: Configure kernel modules
-  configure_dell_xps_kernel_modules
+  # configure_dell_xps_kernel_modules
   
   success "Dell XPS 13 Plus webcam configuration completed"
   CONFIGURED_RUNTIMES+=("Dell XPS 13 Plus webcam drivers")
