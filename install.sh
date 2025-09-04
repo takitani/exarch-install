@@ -875,42 +875,40 @@ toggle_option() {
     12) INSTALL_MICROSOFT_EDGE=$([ "$INSTALL_MICROSOFT_EDGE" == true ] && echo false || echo true) ;;
     13) INSTALL_FIREFOX=$([ "$INSTALL_FIREFOX" == true ] && echo false || echo true) ;;
     
-    # Productivity (21-29)
+    # Productivity (21-26)
     21) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
     22) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
     23) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
     24) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
     25) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
-    26) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
-    27) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
-    28) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
+    26) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
     
-    # Text Editors (41-42)
+    # Development (31-33)
+    31) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
+    32) INSTALL_REMMINA=$([ "$INSTALL_REMMINA" == true ] && echo false || echo true) ;;
+    33) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
+    
+    # Text Editors (41-43)
     41) INSTALL_NANO=$([ "$INSTALL_NANO" == true ] && echo false || echo true) ;;
-    42) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
+    42) INSTALL_MICRO=$([ "$INSTALL_MICRO" == true ] && echo false || echo true) ;;
+    43) INSTALL_KATE=$([ "$INSTALL_KATE" == true ] && echo false || echo true) ;;
     
-    # Communication (61-62)  
-    61) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
-    62) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    # Code Editors (51-56)
+    51) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
+    52) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
+    53) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
     54) INSTALL_JB_TOOLBOX=$([ "$INSTALL_JB_TOOLBOX" == true ] && echo false || echo true) ;;
     55) INSTALL_JB_RIDER=$([ "$INSTALL_JB_RIDER" == true ] && echo false || echo true) ;;
     56) INSTALL_JB_DATAGRIP=$([ "$INSTALL_JB_DATAGRIP" == true ] && echo false || echo true) ;;
-    52) INSTALL_CURSOR=$([ "$INSTALL_CURSOR" == true ] && echo false || echo true) ;;
-    53) INSTALL_VSCODE=$([ "$INSTALL_VSCODE" == true ] && echo false || echo true) ;;
-    51) INSTALL_WINDSURF=$([ "$INSTALL_WINDSURF" == true ] && echo false || echo true) ;;
-    21) INSTALL_MISE_RUNTIMES=$([ "$INSTALL_MISE_RUNTIMES" == true ] && echo false || echo true) ;;
-    22) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
-    23) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
-    24) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
-    25) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
-    26) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
-    27) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
-    28) SETUP_SHELL_IMPROVEMENTS=$([ "$SETUP_SHELL_IMPROVEMENTS" == true ] && echo false || echo true) ;;
-    29) INSTALL_CHEZMOI=$([ "$INSTALL_CHEZMOI" == true ] && echo false || echo true) ;;
-    30) INSTALL_AGE=$([ "$INSTALL_AGE" == true ] && echo false || echo true) ;;
-    31) SETUP_DOTFILES_MANAGEMENT=$([ "$SETUP_DOTFILES_MANAGEMENT" == true ] && echo false || echo true) ;;
-    32) SETUP_DEV_PGPASS=$([ "$SETUP_DEV_PGPASS" == true ] && echo false || echo true) ;;
-    33) SETUP_SSH_KEYS=$([ "$SETUP_SSH_KEYS" == true ] && echo false || echo true) ;;
+    
+    # Communication (61-62)
+    61) INSTALL_SLACK=$([ "$INSTALL_SLACK" == true ] && echo false || echo true) ;;
+    62) INSTALL_TEAMS=$([ "$INSTALL_TEAMS" == true ] && echo false || echo true) ;;
+    
+    # AI & CLI Tools (71-73)
+    71) INSTALL_CLAUDE_CODE=$([ "$INSTALL_CLAUDE_CODE" == true ] && echo false || echo true) ;;
+    72) INSTALL_CODEX_CLI=$([ "$INSTALL_CODEX_CLI" == true ] && echo false || echo true) ;;
+    73) INSTALL_GEMINI_CLI=$([ "$INSTALL_GEMINI_CLI" == true ] && echo false || echo true) ;;
     
     # System Configuration options (90+)
     91) SYNC_HYPR_CONFIGS=$([ "$SYNC_HYPR_CONFIGS" == true ] && echo false || echo true) ;;
