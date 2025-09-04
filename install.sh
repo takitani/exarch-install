@@ -879,9 +879,9 @@ toggle_option() {
     21) INSTALL_COPYQ=$([ "$INSTALL_COPYQ" == true ] && echo false || echo true) ;;
     22) INSTALL_DROPBOX=$([ "$INSTALL_DROPBOX" == true ] && echo false || echo true) ;;
     23) INSTALL_AWS_VPN=$([ "$INSTALL_AWS_VPN" == true ] && echo false || echo true) ;;
-    24) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
-    25) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
-    26) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
+    24) INSTALL_ESPANSO=$([ "$INSTALL_ESPANSO" == true ] && echo false || echo true) ;;
+    25) INSTALL_1PASSWORD=$([ "$INSTALL_1PASSWORD" == true ] && echo false || echo true) ;;
+    26) INSTALL_1PASSWORD_CLI=$([ "$INSTALL_1PASSWORD_CLI" == true ] && echo false || echo true) ;;
     
     # Development (31-33)
     31) INSTALL_POSTMAN=$([ "$INSTALL_POSTMAN" == true ] && echo false || echo true) ;;
@@ -1739,6 +1739,9 @@ disable_screensaver() {
     export HYPRIDLE_WAS_RUNNING=false
   fi
   
+  # Store current script PID for cleanup
+  echo $$ > /tmp/exarch-script.pid
+  
   # Prevent screen from turning off
   if command -v hyprctl >/dev/null 2>&1; then
     hyprctl dispatch dpms on 2>/dev/null || true
@@ -1746,12 +1749,23 @@ disable_screensaver() {
   
   # Prevent system sleep/idle with systemd-inhibit
   if command -v systemd-inhibit >/dev/null 2>&1; then
-    # Start inhibit in background
+    # Start inhibit in background with a more controlled approach
     systemd-inhibit --what=idle:sleep:handle-lid-switch \
                    --who="exarch-install" \
                    --why="Installation in progress - preventing screen lock" \
                    --mode=block \
-                   bash -c 'while true; do sleep 30; done' &
+                   bash -c '
+                     # Store PID in a file for easier cleanup
+                     echo $$ > /tmp/exarch-inhibit.pid
+                     # Simple loop with better signal handling
+                     while true; do
+                       sleep 30
+                       # Check if parent process is still running
+                       if ! kill -0 $PPID 2>/dev/null; then
+                         break
+                       fi
+                     done
+                   ' &
     export INHIBIT_PID=$!
     info "System sleep/idle inhibited (PID: $INHIBIT_PID)"
   fi
@@ -1770,11 +1784,43 @@ disable_screensaver() {
 restore_screensaver() {
   info "Restoring screensaver/idle settings..."
   
-  # Kill the systemd inhibit process
+  # Kill the systemd inhibit process - multiple cleanup methods
   if [[ -n "${INHIBIT_PID:-}" ]]; then
-    kill "$INHIBIT_PID" 2>/dev/null || true
-    info "System sleep/idle inhibition removed"
+    info "Attempting to kill inhibit process (PID: $INHIBIT_PID)..."
+    
+    # Try graceful termination first
+    if kill "$INHIBIT_PID" 2>/dev/null; then
+      info "Inhibit process terminated gracefully"
+    else
+      # Force kill if graceful fails
+      if kill -9 "$INHIBIT_PID" 2>/dev/null; then
+        info "Inhibit process force-killed"
+      else
+        warn "Could not kill inhibit process (may have already terminated)"
+      fi
+    fi
   fi
+  
+  # Also try to kill by PID file if it exists
+  if [[ -f /tmp/exarch-inhibit.pid ]]; then
+    local file_pid
+    file_pid=$(cat /tmp/exarch-inhibit.pid 2>/dev/null)
+    if [[ -n "$file_pid" ]] && [[ "$file_pid" != "$INHIBIT_PID" ]]; then
+      info "Killing inhibit process from PID file (PID: $file_pid)..."
+      kill "$file_pid" 2>/dev/null || kill -9 "$file_pid" 2>/dev/null || true
+    fi
+    # Clean up PID file
+    rm -f /tmp/exarch-inhibit.pid
+  fi
+  
+  # Clean up any remaining inhibit processes that might be orphaned
+  if command -v systemd-inhibit >/dev/null 2>&1; then
+    info "Checking for orphaned inhibit processes..."
+    pkill -f "exarch-install.*systemd-inhibit" 2>/dev/null || true
+  fi
+  
+  # Clean up PID files
+  rm -f /tmp/exarch-script.pid
   
   # Restore gnome screensaver settings
   if [[ "${GNOME_SCREENSAVER_DISABLED:-false}" == "true" ]]; then
@@ -1798,12 +1844,65 @@ restore_screensaver() {
 cleanup_on_exit() {
   echo
   info "Script interrupted or finished - restoring system settings..."
-  restore_screensaver
+  
+  # Prevent recursive cleanup
+  if [[ "${CLEANUP_IN_PROGRESS:-false}" == "true" ]]; then
+    warn "Cleanup already in progress, skipping..."
+    return 0
+  fi
+  
+  export CLEANUP_IN_PROGRESS=true
+  
+  # Restore screensaver with timeout
+  timeout 10 restore_screensaver || warn "Screensaver restore timed out"
+  
+  # Final cleanup - ensure no orphaned processes
+  if [[ -f /tmp/exarch-inhibit.pid ]]; then
+    local final_pid
+    final_pid=$(cat /tmp/exarch-inhibit.pid 2>/dev/null)
+    if [[ -n "$final_pid" ]]; then
+      info "Final cleanup: killing any remaining inhibit process (PID: $final_pid)..."
+      kill -9 "$final_pid" 2>/dev/null || true
+      rm -f /tmp/exarch-inhibit.pid
+    fi
+  fi
+  
   echo "Cleanup completed."
 }
 
-# Set up exit trap
-trap cleanup_on_exit EXIT INT TERM
+# Set up exit trap with better signal handling
+trap cleanup_on_exit EXIT
+trap 'echo; info "Received termination signal, cleaning up..."; cleanup_on_exit; exit 143' TERM
+
+# Function to handle script interruption more gracefully
+handle_interrupt() {
+  echo
+  info "Script interrupted by user (Ctrl+C)"
+  info "Cleaning up and exiting..."
+  
+  # Force cleanup without recursion
+  export CLEANUP_IN_PROGRESS=true
+  
+  # Kill inhibit process immediately
+  if [[ -f /tmp/exarch-inhibit.pid ]]; then
+    local pid
+    pid=$(cat /tmp/exarch-inhibit.pid 2>/dev/null)
+    if [[ -n "$pid" ]]; then
+      info "Force killing inhibit process (PID: $pid)..."
+      kill -9 "$pid" 2>/dev/null || true
+      rm -f /tmp/exarch-inhibit.pid
+    fi
+  fi
+  
+  # Clean up PID files
+  rm -f /tmp/exarch-script.pid
+  
+  echo "Cleanup completed. Exiting..."
+  exit 130
+}
+
+# Set up interrupt handler
+trap handle_interrupt INT
 
 main() {
   # Disable screensaver at start
